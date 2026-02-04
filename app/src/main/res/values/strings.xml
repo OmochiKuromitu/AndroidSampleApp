@@ -1,0 +1,57 @@
+<resources>
+    <string name="app_name">AndroidSampleApp</string>
+
+    <string name="tab_top">トップ</string>
+    <string name="tab_aircon">エアコン</string>
+    <string name="tab_contact">連絡先</string>
+    <string name="tab_sleep">スリープ</string>
+
+    <string name="connection_connected">接続中</string>
+    <string name="connection_connecting">接続しています</string>
+    <string name="connection_disconnected">切断</string>
+
+    <string name="top_incoming_call">%s から着信</string>
+    <string name="top_answer">応答</string>
+    <string name="top_reject">拒否</string>
+    <string name="top_answered">通話を開始しました</string>
+    <string name="top_rejected">着信を拒否しました</string>
+    <string name="top_idle">待機中です</string>
+    <string name="top_aircon_summary">エアコン</string>
+    <string name="command_failed">コマンドの送信に失敗しました</string>
+
+    <string name="aircon_power">運転</string>
+    <string name="aircon_room_temperature">室温 %1$.1f ℃</string>
+    <string name="aircon_target_temperature">設定温度 %1$.1f ℃</string>
+    <string name="aircon_temperature_down">下げる</string>
+    <string name="aircon_temperature_up">上げる</string>
+    <string name="aircon_mode">運転モード</string>
+    <string name="aircon_off">停止中</string>
+    <string name="aircon_offline">機器に接続できていません</string>
+    <string name="aircon_mode_cool">冷房</string>
+    <string name="aircon_mode_heat">暖房</string>
+    <string name="aircon_mode_dry">除湿</string>
+    <string name="aircon_mode_fan">送風</string>
+
+    <string name="contact_phonebook">電話帳</string>
+    <string name="contact_history">履歴</string>
+    <string name="contact_notice">お知らせ</string>
+    <string name="contact_missed">不在</string>
+    <string name="contact_phonebook_empty">連絡先がありません</string>
+    <string name="contact_history_empty">履歴がありません</string>
+    <string name="contact_load_failed">連絡先を取得できませんでした</string>
+    <string name="missed_call_badge">不在着信 %1$d 件</string>
+
+    <string name="sleep_unlock_hint">下から上にスワイプして解除</string>
+    <string name="notice_clear">消去</string>
+    <string name="notice_clear_confirm_title">通知の全消去</string>
+    <string name="notice_clear_confirm_message">通知をすべて消しますか？</string>
+    <string name="dialog_yes">はい</string>
+    <string name="dialog_no">いいえ</string>
+    <string name="notice_empty">通知はありません</string>
+    <string name="notice_load_failed">通知を取得できませんでした</string>
+    <string name="notice_category_call">来客</string>
+    <string name="notice_category_aircon">エアコン</string>
+    <string name="notice_category_alert">警報</string>
+    <string name="notice_category_info">お知らせ</string>
+
+</resources>

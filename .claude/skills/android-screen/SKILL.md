@@ -1,0 +1,356 @@
+---
+name: android-screen
+description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付けパネルアプリ）で画面・タブ・機能を追加、変更、レビューするときの作り方。新しい画面を作る、タブを増やす、ViewModel や Reducer を書く、遷移を足す、API を足す、状態の置き場所に迷う、といった場面では必ず最初にこれを読むこと。「画面を追加して」「エアコン画面に〜を足して」「通知の一覧を〜」のように機能名だけで依頼された場合も、このリポジトリのコードに触るなら該当する。ファイル構成と命名の規約、遷移の書き方、状態の置き場所の判断基準、過去に踏んだコンパイルエラーの罠が入っている。
+---
+
+# このリポジトリで画面を作る
+
+壁付けの操作パネルを題材にしたサンプル（縦固定）。通信はすべて HTTP（Retrofit）で、
+機器の状態は状態取得 API を一定間隔で呼んで取る。全体像と設計理由は `README.md` に書いてある。
+このスキルは「手を動かすときに何をどこへ書くか」に絞る。
+
+## まず守ること（これだけで大半の手戻りが防げる）
+
+1. **遷移を書くのは `ui/navigation/AppNavigation.kt` だけ。** `NavController` を持つのもここだけ。
+   画面や ViewModel から `navigate` を呼ばない。
+2. **`XxxScreen` は表示だけ。** ViewModel も Intent も Effect も知らない。配線は `XxxRoute`。
+   Screen は操作ごとのコールバックを受け取り、それを Intent に変えて `onIntent` に渡すのは Route。
+3. **Reducer は純粋関数。** I/O・時刻取得・コルーチン起動を書かない。副作用は ViewModel の `handle()`。
+4. **状態が変わる入口は Reducer だけ。** 通信結果も共有状態の変化も Intent に変換して通す。
+
+## 画面を 1 つ足す
+
+`ui/<feature>/` に 7 ファイル。既存の `ui/aircon/` が一番素直な見本なので、迷ったらそれを読む。
+
+| ファイル | 中身 |
+| --- | --- |
+| `XxxState.kt` | `UiState` を実装した data class |
+| `XxxIntent.kt` | `UiIntent` を実装した sealed interface |
+| `XxxEffect.kt` | `UiEffect` を実装した sealed interface |
+| `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
+| `XxxViewModel.kt` | `ViewModel` を継承し、`_uiState` / `_effect` / `reducer` を自分で持つ。`@HiltViewModel` |
+| `XxxRoute.kt` | 配線。ViewModel 取得、State 購読、Effect 受け取り、`LaunchedEffect` |
+| `XxxScreen.kt` | 表示。`state` と操作ごとのコールバックだけを受け取る。プレビューもここ |
+
+### 骨組み
+
+```kotlin
+// XxxState.kt
+data class XxxState(
+    val items: List<Item> = emptyList(),
+    val isLoading: Boolean = false,
+) : UiState
+
+// XxxIntent.kt — 入力の一覧。通信結果も「起きたこと」として Intent にする
+sealed interface XxxIntent : UiIntent {
+    data object Started : XxxIntent
+    data class ItemsChanged(val items: List<Item>) : XxxIntent
+    data class ItemClicked(val id: String) : XxxIntent
+    data object LoadFailed : XxxIntent
+}
+
+// XxxEffect.kt — 一回きりの出来事。遷移の「命令」は書かない（理由は後述）
+sealed interface XxxEffect : UiEffect {
+    data class ShowMessage(@StringRes val messageRes: Int) : XxxEffect
+}
+
+// XxxReducer.kt
+class XxxReducer : Reducer<XxxState, XxxIntent> {
+    override fun reduce(state: XxxState, intent: XxxIntent): XxxState = when (intent) {
+        XxxIntent.Started -> state.copy(isLoading = true)
+        is XxxIntent.ItemsChanged -> state.copy(items = intent.items, isLoading = false)
+        XxxIntent.LoadFailed -> state.copy(isLoading = false)
+        is XxxIntent.ItemClicked -> state   // 状態は変えない。Effect で扱う
+    }
+}
+
+// XxxViewModel.kt — 基底クラスは使わない。どの ViewModel もこの形で書く
+@HiltViewModel
+class XxxViewModel @Inject constructor(
+    observeItems: ObserveItemsUseCase,
+    private val doSomething: DoSomethingUseCase,
+) : ViewModel() {
+
+    // init より上に書く（init の中で onIntent を呼んだときに、まだ初期化されていないと落ちる）
+    private val _uiState = MutableStateFlow(XxxState())
+    val uiState: StateFlow<XxxState> = _uiState.asStateFlow()
+
+    private val _effect = Channel<XxxEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
+
+    private val reducer = XxxReducer()
+
+    init {
+        // 共有状態の変化も Intent に変換して Reducer に通す
+        viewModelScope.launch {
+            observeItems().collect { onIntent(XxxIntent.ItemsChanged(it)) }
+        }
+        onIntent(XxxIntent.Started)
+    }
+
+    /** 状態を変えうる入力の入口。操作も、購読した値の変化も、通信の結果も、すべてここを通す。 */
+    fun onIntent(intent: XxxIntent) {
+        var previous: XxxState
+        var current: XxxState
+        // 読んでから書くまでの間に別の更新が入っていたら、読み直してやり直す。
+        do {
+            previous = _uiState.value
+            current = reducer.reduce(previous, intent)
+        } while (!_uiState.compareAndSet(previous, current))
+        viewModelScope.launch { handle(intent, previous, current) }
+    }
+
+    private suspend fun handle(intent: XxxIntent, previous: XxxState, current: XxxState) {
+        when (intent) {
+            is XxxIntent.ItemClicked -> runCatching { doSomething(intent.id) }
+                .onFailure { _effect.send(XxxEffect.ShowMessage(R.string.command_failed)) }
+
+            XxxIntent.Started,
+            is XxxIntent.ItemsChanged,
+            XxxIntent.LoadFailed,
+            -> Unit
+        }
+    }
+}
+```
+
+副作用が無い画面（`MainViewModel`）は、`onIntent` を `_uiState.update { reducer.reduce(it, intent) }` だけにしてよい。
+
+`handle()` が `previous` と `current` の両方を受け取るのは、「またいだ瞬間の 1 回だけ」を
+表現するため。例: `ui/sleep/SleepViewModel` はスワイプの進み具合が 1.0 に達した瞬間だけ
+Effect を出し、指がさらに動いても重ねて送らない。
+
+```kotlin
+// XxxRoute.kt — AppNavigation から呼ばれる入口
+@Composable
+fun XxxRoute(
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    viewModel: XxxViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Effect は LaunchedEffect で受け取る。1 画面で collect するのは 1 か所だけ（Channel なので取り合いになる）
+    LaunchedEffect(viewModel) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is XxxEffect.ShowMessage ->
+                    snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+            }
+        }
+    }
+
+    // 操作を Intent に変えるのは Route。Screen に Intent を渡さない
+    XxxScreen(
+        state = state,
+        onItemClick = { viewModel.onIntent(XxxIntent.ItemClicked(it)) },
+        modifier = modifier,
+    )
+}
+
+// XxxScreen.kt — 表示だけ。ViewModel も Intent も Effect も知らない
+@Composable
+fun XxxScreen(
+    state: XxxState,
+    onItemClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) { /* ... */ }
+
+@PanelPreview
+@Composable
+private fun XxxScreenPreview() {
+    PreviewSurface {
+        XxxScreen(state = XxxState(/* 見たい状態 */), onItemClick = {})
+    }
+}
+```
+
+Route と Screen を分けるのは、Screen を表示だけに保つため。副作用の配線が混ざると、
+見た目を直すつもりでライフサイクルの都合を読む羽目になる。加えて `hiltViewModel()` は
+プレビューで解決できないので、State を引数で渡せる Screen 側でないとプレビューが描けない。
+
+### プレビュー
+
+`@PanelPreview` を付けると縦長サイズでライトとダークが並ぶ。`PreviewSurface` で包むのを
+忘れないこと。包まないと `Dimensions` とタイポグラフィが既定値になり、実機と違う見た目のまま
+調整してしまう。異常系（未接続、送信中、取得失敗）も 1 つずつ出しておくと、実機で
+再現しづらい状態を目で確認できる。MVI は State が 1 つの data class なので、そこが安い。
+
+## 遷移を足す
+
+1. `ui/common/Route.kt` にルート文字列を 1 行。
+2. タブなら `ui/main/MainState.kt` の `MainTab` に 1 行（ルートは `Route.XXX` を渡す）。
+3. `AppNavigation` の `NavHost` に `composable(Route.XXX) { ... }` を 1 つ。
+
+下部バーを出す画面は `MainRoute` で包む。選択状態にするタブは `MainTab.fromRoute(Route.XXX)`
+で引くこと。`MainTab.XXX` と直接書かないのは、遷移に使う値の出どころを `Route` に
+揃えておくため。
+
+### 画面に値を渡す
+
+ルートに引数を付ける。受け取るのは ViewModel の `SavedStateHandle`。
+見本は `ui/contact`（通知から不在着信で飛ぶと履歴タブで開く）。
+
+1. `Route` に引数名と、引数を含むパターン（`"contact?list={list}"`）、ルートを組み立てる関数。
+2. `AppNavigation` の `composable` に `arguments = listOf(navArgument(...) { ... })`。
+   省略可能にするなら `nullable = true` と `defaultValue = null`。
+3. ViewModel のコンストラクタで `savedStateHandle` から読み、**`initialState` で解決する**。
+   Intent にすると、取得が終わる前に既定の表示が一瞬見えてから切り替わる。
+4. 引数つきのルートへ飛ぶときは `restoreState` を使わない。復元すると保存済みの
+   エントリがそのまま戻り、新しく渡した引数が無視される。
+
+飛び先によって伴う情報が違うなら、飛び先の型を `enum` ではなく `sealed interface` にする。
+ドメインは事実（不在着信があった）だけを持ち、「だからどのタブを開くか」は ui 層が決める。
+
+### 画面の中のタブ
+
+遷移を伴わないタブ（連絡先の電話帳 / 履歴）はルートを増やさない。どれを出しているかは
+画面の状態なので `XxxState` に持たせ、`TabRow` で出し分ける。データは開いたときに
+まとめて取り、タブを触るたびに通信しない。
+
+画面から遷移したいときは、ViewModel が **「何が起きたか」** を Effect で返し、
+`AppNavigation` が行き先を決める。
+
+```kotlin
+// よい: 出来事の報告
+sealed interface SleepEffect : UiEffect {
+    data object Unlocked : SleepEffect
+    data class NoticeSelected(val destination: NoticeDestination) : SleepEffect
+}
+
+// 避ける: 遷移の命令
+data class NavigateToAircon(...) : SleepEffect
+```
+
+命令にすると、行き先の判断が画面ごとに散る。報告にしておけば「この出来事が起きたら
+どこへ行くか」が `AppNavigation` だけを読めば分かる。
+
+## 状態をどこに置くか
+
+判断の目安は「全画面が見るか」ではなく **書き手と読み手の数**。
+
+| 置き場所 | 何を置くか | 書き手 |
+| --- | --- | --- |
+| `XxxState` | 画面固有（送信中フラグ、入力中の値、表示の進み具合） | その画面の Reducer |
+| `core/AppStateHolder` | 状態取得 API で定期的に取る機器の状態（接続、着信、エアコン） | data 層（`DeviceRepositoryImpl` と `AirconRepositoryImpl`）だけ |
+| 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数と通知一覧） | そのクラス自身 |
+
+**読み手が 1 画面なら共有の器を作らない。** その画面の `XxxState` に持たせる。
+読み手が 2 か所以上になった時点で `@Singleton` に引き上げる。
+`@Singleton` の保持先は Hilt の `SingletonComponent`（Application と同じ寿命）なので、
+`App` に手で持たせる必要はない。
+
+HTTP のように能動的に取りに行くものは、取得のきっかけを `AppNavigation` が決め、
+マネージャーは呼ばれたら取るだけにする。各画面がそれぞれ叩くと、画面が増えるたびに
+取得のタイミングが散る。実行中の要求が重ならないよう `refresh()` 側で間引くこと。
+見本は `core/MissedCallManager`。
+
+共有の器は書き手が複数いて初めて元が取れる。書き手が 1 つなら、そのクラスに持たせる。
+過去に「全画面が見るから」で `AppStateHolder` にスリープ状態を入れて、状態を持つ場所と
+更新を決める場所が分かれてしまい、`IdleTimer` を読むだけでは挙動が追えなくなった。
+
+## データを足す
+
+通信はすべて HTTP。受け取り方は 2 通りあり、混ぜない。
+複数の出どころを 1 つの一覧に合わせたいときも、取り込みまでは別々に通し、見せる直前で合わせる。
+読み手が 1 画面ならその `XxxState` で、複数ならマネージャーで合わせる。読み手ごとに合わせ方を書くとずれる。
+並べ替えるなら時刻は比べられる値（epoch ミリ秒）で持ち、一覧の key が出どころ間で重ならないようにする。
+
+- **機器の状態に足す（定期取得で届く）** — `model/DeviceStatusResponse` に項目を足し、
+  `data/DeviceRepositoryImpl.applyStatus()` が `AppStateHolder` に反映する。
+  操作の API は `network/DeviceApi` に 1 本足し、操作後の値を返すならリポジトリがそれを反映する。
+- **API から取りに行く** — `model/` にレスポンス型、`data/` のリポジトリが `toDomain()` で変換し、
+  結果を `MutableStateFlow` に持って `StateFlow` で公開する（まだ取れていなければ `null`）。
+  取り直しは `suspend fun refreshXxx()` で、失敗したら例外を投げて前回の値を残す。
+  `AppStateHolder` は通さない。`data/NoticeRepositoryImpl` が見本。
+  - 通信は Retrofit。`network/` に interface（`NoticeApi` が見本）を置き、`di/NetworkModule` で作る。
+    mock flavor 用に `network/FakeApiInterceptor` に応答の JSON を足す。リポジトリに仮データを書かない
+    （書くと Retrofit と JSON の解釈を通らないまま、本物のサーバにつないだ日に初めて壊れる）。
+  - ViewModel は `init` で `filterNotNull().collect` して Intent にし、取り直しは `handle` から呼んで
+    **失敗したときだけ** Intent で戻す。成功した結果は購読側に流れる。
+  - State は「一度でも受け取れたか」のフラグを持ち、読み込み中はそこから決める
+    （`ContactState.isLoading` が見本）。取り直しの完了を Intent で待つと、`StateFlow` は
+    同じ値を入れ直しても流れないので、結果が前と同じだったときに読み込み中のまま止まる。
+- **サーバの文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
+  domain の `companion object` に `fromCode` を書かない。domain が通信の言葉を知ると、
+  形式が変わったときに domain まで直すことになる。送る向き（`AirconMode.toCode()`）も同じ場所。
+- **表示名（「冷房」「来客」など）は domain に持たせず、`ui/common/Labels` の `labelRes()` で
+  `@StringRes` に対応させる。** domain は通信の言葉も画面の言葉も知らない状態に保つ。
+- API に送る本文は `model/` に `@Serializable` の型で足す。端末の ID（`AppConfig.deviceId`）を詰めるのはリポジトリで、呼ぶ側は ID を知らない。
+
+どちらの場合も `domain/repository/` に interface、`domain/usecase/` に UseCase、
+`di/RepositoryModule` に `@Binds` を 1 行。ui 層は実装クラスを知らないままにする。
+
+### UseCase の粒度
+
+**関心事ごとに 1 クラス。** 見る・取り直す・消すを別々のクラスに割らず、1 クラスのメソッドにする
+（見本は `NoticeUseCase` と `MissedCallUseCase`）。ViewModel から呼ぶときも、`core/` のマネージャーから
+呼ぶときも同じ。マネージャーもリポジトリを直接触らず、UseCase を通す。
+
+- よい: `NoticeUseCase` に `observe()` / `refresh()` / `clear()` を置く。`clear()` は消去 API と
+  取り直しを 1 つの操作にまとめ、呼び出し側は API が 2 本であることを知らない。
+- よい: 1 つの操作で複数の API を呼ぶなら、まとめるのは UseCase（電話帳と履歴をまとめて取り直すなど）。
+- 避ける: `GetXxxUseCase` / `DeleteXxxUseCase` のように、リポジトリのメソッドを 1 つずつ包んだクラスを並べる。
+- 避ける: UseCase を消して、マネージャーや ViewModel からリポジトリを直接呼ぶ。
+
+役割はこう分ける。
+
+| 決めること | 置き場所 |
+| --- | --- |
+| どの API をどの順で呼ぶか（消去 → 取り直し、既読 → 件数の取り直し） | UseCase |
+| いつ呼ぶか、実行中の要求を間引くか打ち切るか、失敗をどう見せるか | マネージャー / ViewModel |
+
+ViewModel から呼ぶ UseCase（`ObserveAddressBookUseCase` / `RefreshAddressBookUseCase`、
+`SetAirconXxxUseCase` など）はまだ操作ごとに割れていて、この形に揃っていない。
+新しく作るものは関心事ごとの形で作る。
+
+flavor で変わる値（接続先、タイムアウト、API のベース URL）は
+`app/build.gradle.kts` の `buildConfigField` と `config/AppConfig` に置く。
+アプリ側は `BuildConfig` を直接触らない。
+
+## テスト
+
+Reducer は Android に依存しない純粋な処理なので JVM テストで完結する。
+新しい Reducer を書いたら、最低限「状態が変わる分岐」と「変わらない分岐」を 1 本ずつ。
+
+```
+./gradlew testMockDebugUnitTest
+```
+
+時間に依存するもの（`IdleTimer`）は `runTest` の仮想時間で書く。
+`runCurrent()` と `advanceTimeBy()` を使い分けること。`advanceUntilIdle()` は
+タイマーの完了まで進んでしまうので、「まだ発火していない」を確かめたいときに使えない。
+
+マネージャーのように `backgroundScope` で動かすものは、逆に `advanceUntilIdle()` では進まない。
+`backgroundScope` のコルーチンは待ち対象に入らず、中の `delay` を越えないまま戻ってくる。
+`advanceTimeBy()` で時間を明示して進め、`runCurrent()` で流す（`MissedCallManagerTest` が見本）。
+過去にこれで `MissedCallManagerTest` が 6 本とも落ちたまま気づかれなかった。
+
+## 踏んだ罠（同じことを繰り返さない）
+
+- **常駐クラスでどのスレッドで動かすかを、クラスの中に書かない。** `scope.launch(Dispatchers.Main)` と書くと、
+  テストで `backgroundScope` を渡しても仮想時間が効かず、JVM テストでは Main が無くて落ちる。
+  スレッドは注入するスコープ（`@ApplicationScope`、メインスレッド）で決める。重い処理は呼ぶ側が `withContext` で切り替える。
+  過去に `@ApplicationScope` を `Dispatchers.Default` にしていて、`IdleTimer` のタイマーが UI スレッドからの呼び出しと状態を取り合っていた。
+
+- **`LaunchedEffect` の中から親のコールバックを直接呼ばない。** `LaunchedEffect(viewModel)` の中身は
+  最初に起動したときのまま動き続けるので、親が新しいラムダを渡しても古いほうが呼ばれる。
+  `val current by rememberUpdatedState(onXxx)` を挟んで `current()` を呼ぶ（`SleepRoute` が見本）。
+
+- **KDoc に `path/*.kt` のようなグロブを書かない。** Kotlin のブロックコメントはネストするので、
+  `/*` が内側のコメントを開き、`*/` がそれを閉じてファイル末尾まで飲み込む。バッククォートで囲むか書かない。
+- **トレイリングラムダは最後の引数に束縛される。** `viewModel` のような既定値つき引数が
+  最後にある Composable を `Foo { ... }` と呼ぶと、ラムダがそちらへ渡る。名前付き引数で呼ぶ。
+- **Composable に `@Inject` はできない。** 必要なものは `hiltViewModel()` で取る窓口 ViewModel を作る
+  （`ui/navigation/IdleTimerViewModel` が見本）。ただし Application から触る必要があるものは
+  `@Singleton` にしないと届かない。
+- **data class に必須引数を足したら呼び出し側を全部確認する。** `AppConfig` に 1 つ足して
+  テストの組み立てを直し忘れ、テストのコンパイルが落ちた。
+- **窓口 ViewModel を「画面が必要とするもの」でまとめない。** それは責務ではないので入れる基準が
+  立たず、画面が増えるたびに無関係なものが同居する。責務ごとに分ける。
+
+## 変更したら
+
+`README.md` の該当セクションも直す。設計の理由はあちらに書いてあるので、
+構成を変えたのに README が古いままだと、次の人が理由の分からない規約に従うことになる。

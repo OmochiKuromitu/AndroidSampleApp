@@ -1,0 +1,295 @@
+package com.example.androidsampleapp.ui.sleep
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
+import com.example.androidsampleapp.ui.common.NoticeClearConfirmDialog
+import com.example.androidsampleapp.ui.common.NoticeList
+import com.example.androidsampleapp.ui.common.PreviewSurface
+import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.theme.dimensions
+
+/**
+ * 無操作が続いたときに出す全画面表示。下部バーは出さない。
+ *
+ * 解除は画面下端の帯を上にスワイプしたときだけ。触れただけでは解除しないので、
+ * 拭き掃除や誤接触で操作画面に戻らない。
+ * ただし通知をタップした場合は、意図した操作とみなして復帰と遷移をまとめて行う。
+ *
+ * State を描き、操作をコールバックで返すだけ。Intent は知らない。入口は [SleepRoute]。
+ */
+@Composable
+fun SleepScreen(
+    state: SleepState,
+    onNoticeClick: (Notice) -> Unit,
+    onClearNoticesClick: () -> Unit,
+    onClearNoticesConfirm: () -> Unit,
+    onClearNoticesDismiss: () -> Unit,
+    onUnlockDrag: (Float) -> Unit,
+    onUnlockCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimensions = MaterialTheme.dimensions
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = dimensions.sleepClockTop,
+                    start = dimensions.spaceLarge,
+                    end = dimensions.spaceLarge,
+                    // 解除エリアに隠れてタップできない行が出ないよう、下を空けておく。
+                    bottom = dimensions.unlockAreaHeight,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = state.timeText,
+                style = MaterialTheme.typography.displayLarge,
+                color = Color.White,
+            )
+            Text(
+                text = state.dateText,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White.copy(alpha = 0.7f),
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = dimensions.spaceLarge),
+            ) {
+                NoticeList(
+                    notices = state.notices,
+                    onNoticeClick = onNoticeClick,
+                    onClearClick = onClearNoticesClick,
+                    isLoading = state.isLoadingNotices,
+                    loadFailed = state.noticeLoadFailed,
+                    contentColor = Color.White,
+                )
+            }
+        }
+
+        UnlockArea(
+            progress = state.unlockProgress,
+            onProgress = onUnlockDrag,
+            onCancel = onUnlockCancel,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+
+    if (state.isClearConfirmVisible) {
+        NoticeClearConfirmDialog(onConfirm = onClearNoticesConfirm, onDismiss = onClearNoticesDismiss)
+    }
+}
+
+/**
+ * 画面下端の解除エリア。ここで始まった上方向のドラッグだけを解除操作として扱う。
+ * 帯の高さと必要な移動量は [com.example.androidsampleapp.ui.theme.Dimensions] にある。
+ */
+@Composable
+private fun UnlockArea(
+    progress: Float,
+    onProgress: (Float) -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val areaHeight = MaterialTheme.dimensions.unlockAreaHeight
+    val unlockDistance = MaterialTheme.dimensions.unlockDistance
+    val unlockDistancePx = with(LocalDensity.current) { unlockDistance.toPx() }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(areaHeight)
+            .pointerInput(unlockDistancePx) {
+                var draggedUpPx = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { draggedUpPx = 0f },
+                    onDragEnd = { onCancel() },
+                    onDragCancel = { onCancel() },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        // dragAmount は下方向が正。上方向を正に読み替える。
+                        // 押し戻せば進み具合も戻るので、途中でやめられる。
+                        draggedUpPx = (draggedUpPx - dragAmount).coerceAtLeast(0f)
+                        onProgress(draggedUpPx / unlockDistancePx)
+                    },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        UnlockHint(progress = progress, travel = unlockDistance)
+    }
+}
+
+/** 指の動きに合わせて少し持ち上がり、濃くなる。反応していることを見せるためだけの表示。 */
+@Composable
+private fun UnlockHint(progress: Float, travel: Dp) {
+    val dimensions = MaterialTheme.dimensions
+
+    // OS のホームバーに似せた横バー。指に追従して帯の外へはみ出すが、親は切り取らない。
+    // 角丸は CircleShape（短い辺の 50%）なので、太さを変えても端は丸いまま。
+    Box(
+        modifier = Modifier
+            .offset(y = -(travel * progress * HINT_FOLLOW_RATIO))
+            .alpha(HINT_MIN_ALPHA + (1f - HINT_MIN_ALPHA) * progress)
+            .size(width = dimensions.unlockHintWidth, height = dimensions.unlockHintHeight)
+            .background(color = Color.White, shape = CircleShape),
+    )
+}
+
+/** ヒントは指の移動量そのままではなく、控えめに追従させる。 */
+private const val HINT_FOLLOW_RATIO = 0.3f
+private const val HINT_MIN_ALPHA = 0.35f
+
+/** プレビューの時刻を固定するための基準（2026-09-11 15:00 JST）。 */
+private const val PREVIEW_NOW = 1_789_106_400_000L
+private const val PREVIEW_HOUR = 60 * 60 * 1000L
+
+private val previewNotices = listOf(
+    Notice(
+        "1",
+        NoticeCategory.CALL,
+        "不在着信",
+        "玄関からの呼び出しに応答がありませんでした",
+        PREVIEW_NOW - 1 * PREVIEW_HOUR,
+        NoticeDestination.Contact(hasMissedCall = true),
+    ),
+    Notice("2", NoticeCategory.ALERT, "フィルター", "フィルターの清掃時期です", PREVIEW_NOW - 3 * PREVIEW_HOUR, NoticeDestination.Aircon),
+    Notice("3", NoticeCategory.AIRCON, "リビング", "設定温度を 26.0 度に変更しました", PREVIEW_NOW - 12 * PREVIEW_HOUR, NoticeDestination.Aircon),
+    Notice(
+        "4",
+        NoticeCategory.ALERT,
+        "故障情報：0402",
+        "室外機の通信が途絶えています\n点検を依頼してください",
+        PREVIEW_NOW - 20 * PREVIEW_HOUR,
+        NoticeDestination.Aircon,
+    ),
+    Notice("5", NoticeCategory.INFO, null, "システムを起動しました", PREVIEW_NOW - 30 * PREVIEW_HOUR, NoticeDestination.Top),
+)
+
+@PanelPreview
+@Composable
+private fun SleepScreenPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(
+                timeText = "21:47:05",
+                dateText = "9月10日 (水)",
+                notices = previewNotices,
+            ),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepScreenEmptyPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(timeText = "21:47:05", dateText = "9月10日 (水)"),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepScreenLoadFailedPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(
+                timeText = "21:47:05",
+                dateText = "9月10日 (水)",
+                noticeLoadFailed = true,
+            ),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepScreenClearConfirmPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(
+                timeText = "21:47:05",
+                dateText = "9月10日 (水)",
+                notices = previewNotices,
+                isClearConfirmVisible = true,
+            ),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepScreenSwipingPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(
+                timeText = "21:47:05",
+                dateText = "9月10日 (水)",
+                notices = previewNotices,
+                unlockProgress = 0.7f,
+            ),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
