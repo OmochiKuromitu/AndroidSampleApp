@@ -13,7 +13,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * 無操作の監視。タイムアウトすると [AppStateHolder] のスリープ状態を立てる。
+ * スリープに入るかどうかの判断。条件は 2 つある。
+ *
+ * - 無操作が [AppConfig.sleepTimeout] だけ続いた
+ * - アプリがバックグラウンドに移った（[onEnteredBackground]）
  *
  * 画面遷移そのものは行わない。「スリープに入った」という状態だけを更新し、
  * それを見た [AppNavigation] が遷移する。判断と遷移を分けておくと、
@@ -42,5 +45,16 @@ class IdleTimer @Inject constructor(
     /** 画面が触られた、あるいは復帰させたいときに呼ぶ。 */
     fun onInteraction() {
         interactions.update { it + 1 }
+    }
+
+    /**
+     * アプリがバックグラウンドに移ったときに呼ぶ。無操作時間に関係なくスリープにする。
+     *
+     * 復帰したときではなく離れたときに倒すのは、復帰時に判定すると遷移が走るまでの
+     * 1 フレームだけ前の画面が見えることがあるため。離れる時点で倒しておけば、
+     * 戻ってきた最初の描画がスリープ画面になる。
+     */
+    fun onEnteredBackground() {
+        appStateHolder.updateSleeping(true)
     }
 }

@@ -106,6 +106,27 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
   変化を Intent に変換して自分の Reducer に流す。
 - 画面固有の状態（送信中フラグなど）はここに置かず、各 `XxxState` が持つ。
 
+### スリープに入る条件
+
+判断は `ui/navigation/IdleTimer` が一手に持ち、`AppStateHolder.isSleeping` を立てるだけ。
+遷移は、それを見た `AppNavigation` が行う。条件は 2 つ。
+
+| きっかけ | 呼ぶもの | 挙動 |
+| --- | --- | --- |
+| 無操作が続いた | 内部タイマー（`AppConfig.sleepTimeout`） | タイムアウトでスリープ |
+| バックグラウンドに移った | `IdleTimer.onEnteredBackground()` | 無操作時間に関係なく即スリープ |
+
+操作の検知は `AppNavigation` のルートに置いた `pointerInput` が担う。
+`PointerEventPass.Initial` で子より先に覗くだけなので、画面側の操作は妨げない。
+
+バックグラウンド移行は `App` が `ProcessLifecycleOwner` の `ON_STOP` で拾う。
+Activity の `onStop` を使わないのは、画面回転による再生成でも呼ばれてしまうから。
+`ProcessLifecycleOwner` は構成変更を除外するので、回転ではスリープに落ちない。
+
+復帰したときではなく離れたときに倒しているのは、復帰時に判定すると遷移が走るまでの
+1 フレームだけ前の画面が見えることがあるため。離れる時点で倒しておけば、
+戻ってきた最初の描画がスリープ画面になる。
+
 ### 常時監視
 
 ```
@@ -187,3 +208,7 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
 - State の `SavedStateHandle` 保存はしていない。プロセス終了からの復元が要るなら追加する。
 - 通知権限（Android 13 以降の `POST_NOTIFICATIONS`）の実行時リクエストは未実装。
   権限が無いと前面サービスの通知が出ないだけで、監視自体は動く。
+- `ProcessLifecycleOwner` の `ON_STOP` は約 700ms 遅れて飛ぶ（構成変更を吸収するため）。
+  これより短い離席は「バックグラウンドに移った」と扱われない。
+- プロセスが破棄されてからの再起動は、状態が初期値に戻るためスリープ画面から始まらない。
+  それも必ずスリープにしたいなら、初期値を `isSleeping = true` にする。
