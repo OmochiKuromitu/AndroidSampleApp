@@ -47,23 +47,62 @@ State と Effect を分けるのが要点。「画面遷移」を State に持�
 つまりタップは必ず `RootIntent.TabClicked` として Reducer を通り、
 その結果として Effect が navigate を呼ぶ。UI から直接 `navController.navigate` は呼ばない。
 
-## ディレクトリ
+## ファイル構成
+
+パッケージは `com.example.androidsampleapp` の 1 つだけ。
+サブパッケージを作らず、名前の接頭辞で役割を示している。
 
 ```
 app/src/main/java/com/example/androidsampleapp/
 ├── MainActivity.kt
-├── core/mvi/            MVI の土台（UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect）
-├── data/                Task, TaskRepository（インメモリ。通信や DB に差し替える前提）
-├── di/AppGraph.kt       手書きの依存グラフ。大きくなったら Hilt に置き換える
-├── navigation/          TopLevelDestination（タブ定義）, Routes, AppNavHost
-├── root/                Scaffold + Navigation bar。タブ切り替えの MVI
-├── feature/home/        一覧 → 詳細（タブ内遷移）
-├── feature/search/      入力の debounce と、古い結果の破棄
-├── feature/profile/     設定トグルと保存 Effect
-└── ui/theme/
+│
+│  ── MVI の土台 ──
+├── Mvi.kt                  UiState / UiIntent / UiEffect / Reducer
+├── MviViewModel.kt         Intent の受け口、Reducer の適用、副作用の隔離
+├── CollectEffect.kt        Effect を STARTED の間だけ受け取る Composable
+│
+│  ── データ ──
+├── Task.kt
+├── TaskRepository.kt       インメモリ。通信や DB に差し替える前提
+├── AppGraph.kt             手書きの依存グラフ。大きくなったら Hilt に置き換える
+│
+│  ── ナビゲーション ──
+├── TopLevelDestination.kt  タブ定義。1 行足せばタブが 1 つ増える
+├── Routes.kt               ホームタブ内のルート
+├── AppNavHost.kt
+│
+│  ── 外枠（タブ切り替えの MVI） ──
+├── RootContract.kt         RootState / RootIntent / RootEffect
+├── RootReducer.kt
+├── RootViewModel.kt
+├── RootScreen.kt           Scaffold + Navigation bar
+│
+│  ── ホームタブ ──
+├── HomeContract.kt
+├── HomeReducer.kt
+├── HomeViewModel.kt
+├── HomeScreen.kt
+├── DetailContract.kt       一覧 -> 詳細（タブ内遷移）
+├── DetailReducer.kt
+├── DetailViewModel.kt
+├── DetailScreen.kt
+│
+│  ── 検索タブ ──
+├── SearchContract.kt       入力の debounce と、古い結果の破棄
+├── SearchReducer.kt
+├── SearchViewModel.kt
+├── SearchScreen.kt
+│
+│  ── プロフィールタブ ──
+├── ProfileContract.kt
+├── ProfileReducer.kt
+├── ProfileViewModel.kt
+├── ProfileScreen.kt
+│
+└── Theme.kt
 ```
 
-機能を 1 つ足すときは `feature/<name>/` に `Contract` / `Reducer` / `ViewModel` / `Screen` の 4 ファイル、
+機能を 1 つ足すときは `<Name>Contract` / `<Name>Reducer` / `<Name>ViewModel` / `<Name>Screen` の 4 ファイル、
 タブを 1 つ足すときは `TopLevelDestination` に 1 行と `AppNavHost` に `composable` を 1 つ。
 
 ## テスト
