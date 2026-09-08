@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">AndroidSampleApp</string>
+
+    <string name="tab_home">ホーム</string>
+    <string name="tab_search">検索</string>
+    <string name="tab_profile">プロフィール</string>
+
+    <string name="home_title">タスク</string>
+    <string name="home_reload">再読み込み</string>
+    <string name="home_empty">タスクがありません</string>
+    <string name="home_detail_title">タスク詳細</string>
+    <string name="home_detail_back">戻る</string>
+    <string name="home_detail_toggle_done">完了状態を切り替える</string>
+
+    <string name="search_title">検索</string>
+    <string name="search_hint">タスク名で絞り込み</string>
+    <string name="search_clear">クリア</string>
+    <string name="search_empty">該当するタスクがありません</string>
+    <string name="search_prompt">キーワードを入力してください</string>
+
+    <string name="profile_title">プロフィール</string>
+    <string name="profile_notifications">通知を受け取る</string>
+    <string name="profile_dark_theme">ダークテーマ</string>
+    <string name="profile_save">設定を保存</string>
+</resources>
