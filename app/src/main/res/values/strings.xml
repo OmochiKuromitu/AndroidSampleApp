@@ -1,25 +1,34 @@
 <resources>
     <string name="app_name">AndroidSampleApp</string>
 
-    <string name="tab_home">ホーム</string>
-    <string name="tab_search">検索</string>
-    <string name="tab_profile">プロフィール</string>
+    <string name="tab_top">トップ</string>
+    <string name="tab_aircon">エアコン</string>
+    <string name="tab_sleep">スリープ</string>
 
-    <string name="home_title">タスク</string>
-    <string name="home_reload">再読み込み</string>
-    <string name="home_empty">タスクがありません</string>
-    <string name="home_detail_title">タスク詳細</string>
-    <string name="home_detail_back">戻る</string>
-    <string name="home_detail_toggle_done">完了状態を切り替える</string>
+    <string name="connection_connected">接続中</string>
+    <string name="connection_connecting">接続しています</string>
+    <string name="connection_disconnected">切断</string>
 
-    <string name="search_title">検索</string>
-    <string name="search_hint">タスク名で絞り込み</string>
-    <string name="search_clear">クリア</string>
-    <string name="search_empty">該当するタスクがありません</string>
-    <string name="search_prompt">キーワードを入力してください</string>
+    <string name="top_incoming_call">%s から着信</string>
+    <string name="top_answer">応答</string>
+    <string name="top_reject">拒否</string>
+    <string name="top_answered">通話を開始しました</string>
+    <string name="top_rejected">着信を拒否しました</string>
+    <string name="top_idle">待機中です</string>
+    <string name="top_aircon_summary">エアコン</string>
+    <string name="command_failed">コマンドの送信に失敗しました</string>
 
-    <string name="profile_title">プロフィール</string>
-    <string name="profile_notifications">通知を受け取る</string>
-    <string name="profile_dark_theme">ダークテーマ</string>
-    <string name="profile_save">設定を保存</string>
+    <string name="aircon_power">運転</string>
+    <string name="aircon_room_temperature">室温 %1$.1f ℃</string>
+    <string name="aircon_target_temperature">設定温度 %1$.1f ℃</string>
+    <string name="aircon_temperature_down">下げる</string>
+    <string name="aircon_temperature_up">上げる</string>
+    <string name="aircon_mode">運転モード</string>
+    <string name="aircon_off">停止中</string>
+    <string name="aircon_offline">機器に接続できていません</string>
+
+    <string name="sleep_hint">画面をタップすると復帰します</string>
+
+    <string name="service_notification_channel">機器の監視</string>
+    <string name="service_notification_title">機器を監視しています</string>
 </resources>

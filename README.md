@@ -1,123 +1,189 @@
 # AndroidSampleApp
 
-Jetpack Compose + MVI (Model-View-Intent) の Android サンプル。
-Navigation bar で 3 タブ（ホーム / 検索 / プロフィール）を切り替え、タブ切り替えも
-Intent → Reducer を通す構成にしてある。
+Jetpack Compose + MVI の Android アプリ。壁付けの操作パネルを想定していて、
+機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばスリープ画面に落ちる。
 
-## 動かし方
+- 下部バーで 3 タブ（トップ / エアコン / スリープ）
+- 画面遷移も含めて Intent → Reducer を通す
+- flavor は `mock`（実機不要）と `product`（実機接続）
 
-Android Studio でこのディレクトリを開くだけ。追加設定は不要。
+## ビルド
 
-- compileSdk / targetSdk: 35, minSdk: 24
-- Android Gradle Plugin 8.7.3 / Kotlin 2.0.21 / Gradle 8.11.1
+Android Studio でこのディレクトリを開く。実行構成は 4 つ（mock/product × debug/release）。
+実機が手元に無いときは **mockDebug** を選ぶ。擬似デバイスが接続・エアコン状態・着信を流す。
+
+- compileSdk / targetSdk 35, minSdk 24
+- AGP 8.7.3 / Kotlin 2.0.21 / Gradle 8.11.1 / Hilt 2.52 (KSP)
 - Compose BOM 2024.12.01, Navigation Compose 2.8.5
 
-Android Studio が新しい場合、AGP のアップグレード提案が出ることがある。従って問題ない。
+---
 
-## データの流れ
+## アーキテクチャ
+
+### レイヤと依存の向き
 
 ```
-     ┌──────────────── UiState ────────────────┐
-     │                                          │
-     ▼                                          │
- Composable ──dispatch(UiIntent)──▶ MviViewModel ┤
-     ▲                                  │       │
-     │                                  ├── Reducer(state, intent) -> state
-     └────collect(UiEffect)─────────────┘       │
-                                    handle(...) ┘  ← I/O・遷移命令・追加 Intent
+        ui  ──────▶  domain  ◀──────  data
+        │            (interface)        │
+        │                               ├─▶ network   (TCP / UDP)
+        └─▶ core (AppStateHolder, MVI の土台)
+                     ▲                  │
+                     └──────────────────┘
+                       共有状態への書き込みは data / IdleTimer だけ
+
+        service ─▶ domain.DeviceRepository   常時監視の寿命管理
+        di      ─▶ interface と実装の結線
+        config  ─▶ flavor 由来の設定（BuildConfig の読み口）
 ```
 
-- **State**: 画面が描画に使う唯一の入力。不変の data class。
-- **Intent**: 状態を変えうる入力すべて。ユーザー操作だけでなく、通信結果（`TasksLoaded`）も Intent として Reducer に戻す。
-- **Reducer**: `(State, Intent) -> State` の純粋関数。I/O・時刻取得・コルーチン起動を書かない。
-- **Effect**: 状態として保持すべきでない一回きりの出来事（画面遷移、スナックバー）。
+矢印は依存の向き。**ui は data / network を知らない**。domain の interface と UseCase だけを見る。
+実装の差し替えは `di/RepositoryModule` の `@Binds` 2 行で完結する。
 
-State と Effect を分けるのが要点。「画面遷移」を State に持たせると、
-画面回転や再生成のたびに同じ遷移が再実行される。
+### MVI のデータの流れ
 
-## 画面遷移の扱い
+```
+     ┌──────────────── State ────────────────┐
+     │                                        │
+     ▼                                        │
+ Composable ──dispatch(Intent)──▶ ViewModel ──┤
+     ▲                               │        │
+     │                               ├── Reducer(state, intent) -> state   純粋関数
+     └────collect(Effect)────────────┘        │
+                             handle(...) ─────┘  UseCase 呼び出し・Effect 送出・追加 dispatch
+```
+
+- **State** — 画面が描画に使う唯一の入力。不変の data class。
+- **Intent** — 状態を変えうる入力すべて。ユーザー操作に限らず、
+  機器からの通知（`AirconChanged`）や送信結果（`CommandSucceeded`）も Intent にして戻す。
+  こうすると状態が変わる経路が Reducer 1 か所に収まる。
+- **Reducer** — `(State, Intent) -> State`。I/O・時刻取得・コルーチン起動を書かない。
+- **Effect** — 状態として持つべきでない一回きりの出来事（遷移、スナックバー）。
+
+State と Effect を分けるのが要点。遷移を State に持たせると、画面回転などの再生成のたびに
+同じ遷移が走る。逆に「選択中のタブ」を Effect にすると、復帰したときに復元できない。
+
+### ui/<feature> の 6 ファイル
+
+画面 1 つにつき、必ずこの 6 つを置く。ファイル名で役割が分かる状態を保つ。
+
+| ファイル | 中身 |
+| --- | --- |
+| `XxxState.kt` | 画面の状態。`UiState` を実装した data class |
+| `XxxIntent.kt` | 入力の一覧。`UiIntent` を実装した sealed interface |
+| `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface |
+| `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
+| `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
+| `XxxScreen.kt` | Composable。State を描き、Intent を投げ、Effect を受ける |
+
+土台は `core/mvi/` にある（`Mvi.kt` / `MviViewModel.kt` / `CollectEffect.kt`）。
+`MviViewModel` は Intent を 1 本のチャネルに集約し、到着順に reduce する。
+副作用だけは並行に走らせて、長い I/O が後続 Intent の reduce を止めないようにしている。
+
+### 画面遷移の扱い
 
 | 対象 | 表現 | 理由 |
 | --- | --- | --- |
-| 選択中のタブ | `RootState.selectedTab`（State） | 再生成後も復元されるべき値。Navigation bar のハイライトはここだけを見る |
-| タブへの遷移 | `RootEffect.NavigateToTab`（Effect） | 一回きりの命令 |
-| 同じタブの再タップ | `RootEffect.PopToTabRoot`（Effect） | 状態は変わらないが動作はある |
-| 戻るキーでの移動 | `RootIntent.BackStackChanged`（Intent） | NavController が先に動いた結果を State に追従させるだけ。ここから再遷移するとループする |
+| 選択中のタブ | `MainState.selectedTab`（State） | 再生成後も復元されるべき値。下部バーのハイライトはここだけを見る |
+| タブへの遷移 | `MainEffect.NavigateToTab`（Effect） | 一回きりの命令 |
+| 同じタブの再タップ | `MainEffect.PopToTabRoot`（Effect） | 状態は変わらないが動作はある |
+| スリープへ | `MainEffect.NavigateToSleep`（Effect） | タブではないので `selectedTab` を動かさない。復帰時に元のタブへ戻る |
+| 戻る操作での移動 | `MainIntent.BackStackChanged`（Intent） | NavController が先に動いた結果を State に追従させるだけ。ここから再遷移するとループする |
 
-つまりタップは必ず `RootIntent.TabClicked` として Reducer を通り、
-その結果として Effect が navigate を呼ぶ。UI から直接 `navController.navigate` は呼ばない。
+タップは必ず `MainIntent.TabClicked` として Reducer を通り、その結果の Effect が navigate を呼ぶ。
+Composable から直接 `navController.navigate` は呼ばない。
 
-## ファイル構成
+NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）が `main` と `sleep`、
+内側（`ui/main/MainScreen`）がタブの中身。下部バーの有無で階層を分けている。
 
-パッケージは `com.example.androidsampleapp` の 1 つだけ。
-サブパッケージを作らず、名前の接頭辞で役割を示している。
+### 共有状態 — AppStateHolder
+
+接続状態・着信・エアコンの現在値・スリープ中かどうかは、全画面が見る。
+これを `core/AppStateHolder` が単独で持つ。
+
+- **書き込むのは 2 か所だけ** — 受信を反映する `data/DeviceRepositoryImpl` と、
+  無操作を検知する `ui/navigation/IdleTimer`。
+- 画面と ViewModel は読むだけ。UseCase 経由で `StateFlow` を受け取り、
+  変化を Intent に変換して自分の Reducer に流す。
+- 画面固有の状態（送信中フラグなど）はここに置かず、各 `XxxState` が持つ。
+
+### 常時監視
+
+```
+MonitoringService (前面サービス)
+  └─ DeviceRepository.monitor()          再接続ループ。切れたら待って繋ぎ直す
+       └─ TcpClient.connect(): Flow      1 行 = 1 メッセージ
+            └─ MessageParser.parse()     文字列 -> DeviceMessage
+                 └─ AppStateHolder       接続状態・着信・エアコンを更新
+
+操作: ViewModel -> UseCase -> Repository -> UdpCommandClient.send(CommandRequest)
+      結果は TCP 側の通知で返ってくるので、送信時に楽観的な更新はしない
+```
+
+サービスは寿命の管理だけを持ち、再接続の判断は Repository 側にある。
+`TcpClient` の `readLine()` は割り込めないので、`soTimeout` で定期的に制御を戻し、
+コルーチンのキャンセルを見られるようにしている。
+
+---
+
+## ディレクトリ
 
 ```
 app/src/main/java/com/example/androidsampleapp/
+├── App.kt                  @HiltAndroidApp
 ├── MainActivity.kt
-│
-│  ── MVI の土台 ──
-├── Mvi.kt                  UiState / UiIntent / UiEffect / Reducer
-├── MviViewModel.kt         Intent の受け口、Reducer の適用、副作用の隔離
-├── CollectEffect.kt        Effect を STARTED の間だけ受け取る Composable
-│
-│  ── データ ──
-├── Task.kt
-├── TaskRepository.kt       インメモリ。通信や DB に差し替える前提
-├── AppGraph.kt             手書きの依存グラフ。大きくなったら Hilt に置き換える
-│
-│  ── ナビゲーション ──
-├── TopLevelDestination.kt  タブ定義。1 行足せばタブが 1 つ増える
-├── Routes.kt               ホームタブ内のルート
-├── AppNavHost.kt
-│
-│  ── 外枠（タブ切り替えの MVI） ──
-├── RootContract.kt         RootState / RootIntent / RootEffect
-├── RootReducer.kt
-├── RootViewModel.kt
-├── RootScreen.kt           Scaffold + Navigation bar
-│
-│  ── ホームタブ ──
-├── HomeContract.kt
-├── HomeReducer.kt
-├── HomeViewModel.kt
-├── HomeScreen.kt
-├── DetailContract.kt       一覧 -> 詳細（タブ内遷移）
-├── DetailReducer.kt
-├── DetailViewModel.kt
-├── DetailScreen.kt
-│
-│  ── 検索タブ ──
-├── SearchContract.kt       入力の debounce と、古い結果の破棄
-├── SearchReducer.kt
-├── SearchViewModel.kt
-├── SearchScreen.kt
-│
-│  ── プロフィールタブ ──
-├── ProfileContract.kt
-├── ProfileReducer.kt
-├── ProfileViewModel.kt
-├── ProfileScreen.kt
-│
-└── Theme.kt
+├── config/                 flavor に対応した設定（AppConfig）
+├── core/                   AppStateHolder — 全画面共有状態の単一管理者
+│   └── mvi/                UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect
+├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
+├── service/                MonitoringService — TCP の常時監視
+├── domain/
+│   ├── model/              Aircon / ConnectionState / IncomingCall
+│   ├── repository/         DeviceRepository / AirconRepository（interface）
+│   └── usecase/            ObserveXxx / SetXxx / AnswerCall …
+├── data/                   Repository 実装
+├── network/                TcpClient / MessageParser / UdpCommandClient
+├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
+└── ui/
+    ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
+    ├── common/             Route / AppHeader / 共通コンポーネント
+    ├── theme/              Color / Type / Dimensions / Theme
+    ├── main/               BottomNaviBar とメイン画面（MVI 6 ファイル + BottomNaviBar）
+    ├── top/                メイン画面に入れる画面（MVI 6 ファイル）
+    ├── aircon/             エアコン操作（MVI 6 ファイル）
+    └── sleep/              スリープ画面（MVI 6 ファイル）
 ```
 
-機能を 1 つ足すときは `<Name>Contract` / `<Name>Reducer` / `<Name>ViewModel` / `<Name>Screen` の 4 ファイル、
-タブを 1 つ足すときは `TopLevelDestination` に 1 行と `AppNavHost` に `composable` を 1 つ。
+`model/` と `domain/model/` の使い分け:
+
+- `model/` — 通信の語彙。受信した 1 行の解釈結果、送るコマンド、機器仕様の固定値。
+- `domain/model/` — アプリが扱う語彙。画面と UseCase はこちらだけを見る。
+
+変換は data 層（`DeviceRepositoryImpl`）が担う。プロトコルが変わっても影響を network と data に閉じる。
+
+### 足すとき
+
+- **画面を 1 つ足す** — `ui/<name>/` に 6 ファイル。ViewModel は `@HiltViewModel`。
+- **タブを 1 つ足す** — `MainTab` に 1 行と `MainScreen` の NavHost に `composable` を 1 つ。
+- **機器の機能を 1 つ足す** — `model/CommandRequest` にコマンド、`MessageParser` に解釈、
+  `domain/repository` に口、`data` に実装、`domain/usecase` に UseCase。
 
 ## テスト
 
-Reducer は純粋関数なので、Android 依存なしの JVM テストで完結する。
+Reducer と MessageParser は Android に依存しない純粋な処理なので、JVM テストで完結する。
 
 ```
-./gradlew test
+./gradlew testMockDebugUnitTest
 ```
 
-`app/src/test/` に Home / Search / Root の Reducer テストを置いてある。
-ViewModel まで含めて検証したい場合は `kotlinx-coroutines-test` の `runTest` を使う（依存は追加済み）。
+`app/src/test/` に Main / Top / Aircon の Reducer と MessageParser のテストがある。
+ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `runTest` を使う（依存は追加済み）。
 
 ## 割り切っている点
 
-- DI は `AppGraph`（手書き）。実務では Hilt を推奨。
-- Repository はインメモリ + `delay` のスタブ。
-- `SavedStateHandle` による State の保存はしていない（プロセス終了からの復元が必要なら追加する）。
+- 通信プロトコルは `|` 区切りのテキストという仮のもの。実仕様に合わせて
+  `MessageParser` と `CommandRequest` を差し替える。
+- 着信専用画面は作らず、トップ画面にカードとして出している。
+  専用画面にするなら `ui/call/` を 6 ファイルで足し、`IncomingCallRouter` の行き先を変える。
+- State の `SavedStateHandle` 保存はしていない。プロセス終了からの復元が要るなら追加する。
+- 通知権限（Android 13 以降の `POST_NOTIFICATIONS`）の実行時リクエストは未実装。
+  権限が無いと前面サービスの通知が出ないだけで、監視自体は動く。

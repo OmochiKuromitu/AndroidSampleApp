@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -16,6 +18,29 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // flavor ごとの接続先や挙動は BuildConfig に出し、config/AppConfig が読む。
+    flavorDimensions += "environment"
+    productFlavors {
+        create("mock") {
+            dimension = "environment"
+            applicationIdSuffix = ".mock"
+            versionNameSuffix = "-mock"
+            buildConfigField("String", "DEVICE_HOST", "\"127.0.0.1\"")
+            buildConfigField("int", "TCP_PORT", "50100")
+            buildConfigField("int", "UDP_PORT", "50101")
+            buildConfigField("boolean", "USE_FAKE_DEVICE", "true")
+            buildConfigField("long", "SLEEP_TIMEOUT_MS", "30000L")
+        }
+        create("product") {
+            dimension = "environment"
+            buildConfigField("String", "DEVICE_HOST", "\"192.168.10.20\"")
+            buildConfigField("int", "TCP_PORT", "50100")
+            buildConfigField("int", "UDP_PORT", "50101")
+            buildConfigField("boolean", "USE_FAKE_DEVICE", "false")
+            buildConfigField("long", "SLEEP_TIMEOUT_MS", "120000L")
+        }
     }
 
     buildTypes {
@@ -39,6 +64,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -47,6 +73,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.activity.compose)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -54,7 +81,12 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
+    ksp(libs.hilt.compiler)
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
