@@ -189,8 +189,11 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 
 | 項目 | 既定値 | 置き場所 |
 | --- | --- | --- |
-| 受け付ける帯の高さ | 200dp | `Dimensions.unlockAreaHeight` |
+| 受け付ける帯の高さ | 50dp | `Dimensions.unlockAreaHeight` |
 | 解除に必要な移動量 | 120dp | `Dimensions.unlockDistance` |
+
+帯より移動量が大きいのは矛盾ではない。ドラッグは始まった位置で受け付けが決まり、
+その後は帯の外へ出ても追跡が続く。帯は「どこから始めたら解除操作とみなすか」だけを決める。
 
 指の移動量は画面側で 0f..1f に正規化し、`SleepIntent.UnlockDragged` として
 Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒント表示が

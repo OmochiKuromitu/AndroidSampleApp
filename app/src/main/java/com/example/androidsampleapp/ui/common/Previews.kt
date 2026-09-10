@@ -21,17 +21,6 @@ import com.example.androidsampleapp.ui.theme.AppTheme
 )
 annotation class PanelPreview
 
-/** 縦に長い画面（スリープ画面のように一覧を抱えるもの）用。 */
-@Preview(name = "Light", widthDp = 800, heightDp = 1280, showBackground = true)
-@Preview(
-    name = "Dark",
-    widthDp = 800,
-    heightDp = 1280,
-    showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-)
-annotation class TallPanelPreview
-
 /**
  * プレビュー用の下敷き。テーマと背景色を実機と揃える。
  *

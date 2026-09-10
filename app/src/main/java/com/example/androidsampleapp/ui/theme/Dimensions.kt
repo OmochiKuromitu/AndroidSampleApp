@@ -19,8 +19,11 @@ data class Dimensions(
     val cardCorner: Dp = 16.dp,
     /** スリープ画面で時刻表示を置く、上端からの距離。 */
     val sleepClockTop: Dp = 100.dp,
-    /** スリープ解除のスワイプを受け付ける、画面下端の帯の高さ。 */
-    val unlockAreaHeight: Dp = 200.dp,
+    /**
+     * スリープ解除のスワイプを受け付ける、画面下端の帯の高さ。
+     * ドラッグは帯の外へ出ても続くので、[unlockDistance] より小さくてよい。
+     */
+    val unlockAreaHeight: Dp = 50.dp,
     /** 解除に必要な上方向の移動量。これを超えたら解除する。 */
     val unlockDistance: Dp = 120.dp,
 )

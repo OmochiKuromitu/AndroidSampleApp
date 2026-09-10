@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -34,7 +35,7 @@ import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.ui.common.NoticeList
 import com.example.androidsampleapp.ui.common.PreviewSurface
-import com.example.androidsampleapp.ui.common.TallPanelPreview
+import com.example.androidsampleapp.ui.common.PanelPreview
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
@@ -160,12 +161,13 @@ private fun UnlockArea(
 /** 指の動きに合わせて少し持ち上がり、濃くなる。反応していることを見せるためだけの表示。 */
 @Composable
 private fun UnlockHint(progress: Float, travel: Dp) {
-    Column(
+    // 帯が低いので横並びにする。指に追従して帯の外へはみ出すが、親は切り取らない。
+    Row(
         modifier = Modifier
             .offset(y = -(travel * progress * HINT_FOLLOW_RATIO))
             .alpha(HINT_MIN_ALPHA + (1f - HINT_MIN_ALPHA) * progress),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.dimensions.spaceSmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.dimensions.spaceSmall),
     ) {
         Icon(
             imageVector = Icons.Filled.KeyboardArrowUp,
@@ -191,7 +193,7 @@ private val previewNotices = listOf(
     Notice("4", NoticeCategory.INFO, "システムを起動しました", NoticeDestination.TOP),
 )
 
-@TallPanelPreview
+@PanelPreview
 @Composable
 private fun SleepContentPreview() {
     PreviewSurface {
@@ -206,7 +208,7 @@ private fun SleepContentPreview() {
     }
 }
 
-@TallPanelPreview
+@PanelPreview
 @Composable
 private fun SleepContentEmptyPreview() {
     PreviewSurface {
@@ -217,7 +219,7 @@ private fun SleepContentEmptyPreview() {
     }
 }
 
-@TallPanelPreview
+@PanelPreview
 @Composable
 private fun SleepContentSwipingPreview() {
     PreviewSurface {
