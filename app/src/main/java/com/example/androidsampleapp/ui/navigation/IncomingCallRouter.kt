@@ -21,6 +21,6 @@ fun IncomingCallRouter(
     val incomingCall by appStateHolder.incomingCall.collectAsStateWithLifecycle()
 
     LaunchedEffect(incomingCall) {
-        if (incomingCall != null) idleTimer.onInteraction()
+        if (incomingCall != null) idleTimer.wake()
     }
 }

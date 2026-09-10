@@ -120,6 +120,14 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 操作の検知は `AppNavigation` のルートに置いた `pointerInput` が担う。
 `PointerEventPass.Initial` で子より先に覗くだけなので、画面側の操作は妨げない。
 
+`IdleTimer` の入口は 2 つに分かれている。
+
+- `onInteraction()` — 無操作タイマーを測り直す。**スリープ中は無視する。**
+- `wake()` — スリープを解除する。解除操作と着信からだけ呼ぶ。
+
+触れただけで解除されると、下で述べる解除ジェスチャを定義した意味がなくなる。
+判断を `IdleTimer` に閉じ込めてあるので、画面側は「触られた」と伝えるだけでよい。
+
 きっかけの検知は `App` が 2 系統でやっている。
 
 - **他アプリへの移動** — `ProcessLifecycleOwner` の `ON_STOP`。
@@ -136,6 +144,24 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 復帰したときではなく離れたときに倒しているのは、復帰時に判定すると遷移が走るまでの
 1 フレームだけ前の画面が見えることがあるため。離れる時点で倒しておけば、
 戻ってきた最初の描画がスリープ画面になる。
+
+### スリープの解除
+
+画面下端の帯を上にスワイプしたときだけ解除する。タップでは解除しない。
+拭き掃除や誤接触で操作画面に戻らないようにするため。
+
+| 項目 | 既定値 | 置き場所 |
+| --- | --- | --- |
+| 受け付ける帯の高さ | 200dp | `Dimensions.unlockAreaHeight` |
+| 解除に必要な移動量 | 120dp | `Dimensions.unlockDistance` |
+
+指の移動量は画面側で 0f..1f に正規化し、`SleepIntent.UnlockDragged` として
+Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒント表示が
+その値に応じて持ち上がって濃くなる。押し戻せば進み具合も戻るので、途中でやめられる。
+
+解除は `SleepViewModel.handle()` が `previous` と `current` を見比べ、
+進み具合が 1.0 に達した瞬間の 1 回だけ `SleepEffect.Wake` を出す。
+指がさらに動いても重ねて送らない。
 
 ### 常時監視
 

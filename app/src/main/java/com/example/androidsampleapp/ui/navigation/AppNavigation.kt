@@ -44,6 +44,7 @@ fun AppNavigation(
         modifier = modifier
             .fillMaxSize()
             // 子より先にイベントを覗いて無操作タイマーを戻す。子の操作は妨げない。
+            // スリープ中は IdleTimer 側で無視されるので、触れただけでは解除されない。
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -58,7 +59,7 @@ fun AppNavigation(
                 MainScreen(onNavigateToSleep = { appStateHolder.updateSleeping(true) })
             }
             composable(Route.SLEEP) {
-                SleepScreen(onWake = { idleTimer.onInteraction() })
+                SleepScreen(onWake = { idleTimer.wake() })
             }
         }
     }

@@ -38,7 +38,13 @@ class SleepViewModel @Inject constructor(
 
     override suspend fun handle(intent: SleepIntent, previous: SleepState, current: SleepState) {
         when (intent) {
-            SleepIntent.ScreenTapped -> sendEffect(SleepEffect.Wake)
+            // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
+            is SleepIntent.UnlockDragged ->
+                if (!previous.isUnlockReached && current.isUnlockReached) {
+                    sendEffect(SleepEffect.Wake)
+                }
+
+            SleepIntent.UnlockCancelled,
             is SleepIntent.Ticked,
             is SleepIntent.ConnectionStateChanged,
             -> Unit

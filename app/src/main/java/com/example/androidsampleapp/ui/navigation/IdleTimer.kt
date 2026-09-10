@@ -46,8 +46,20 @@ class IdleTimer @Inject constructor(
         }
     }
 
-    /** 画面が触られた、あるいは復帰させたいときに呼ぶ。 */
+    /**
+     * 画面が触られた。無操作タイマーを測り直す。
+     *
+     * スリープ中は無視する。触れただけで解除されると、スリープ画面側で
+     * 解除操作（下からのスワイプ）を定義しても意味がなくなるため。
+     * 解除は [wake] を使う。
+     */
     fun onInteraction() {
+        if (appStateHolder.isSleeping.value) return
+        interactions.update { it + 1 }
+    }
+
+    /** スリープを解除する。解除操作や着信など、明示的に起こしたいときに呼ぶ。 */
+    fun wake() {
         interactions.update { it + 1 }
     }
 

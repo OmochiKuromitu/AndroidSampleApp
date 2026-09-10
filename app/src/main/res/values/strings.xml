@@ -27,7 +27,7 @@
     <string name="aircon_off">停止中</string>
     <string name="aircon_offline">機器に接続できていません</string>
 
-    <string name="sleep_hint">画面をタップすると復帰します</string>
+    <string name="sleep_unlock_hint">下から上にスワイプして解除</string>
 
     <string name="service_notification_channel">機器の監視</string>
     <string name="service_notification_title">機器を監視しています</string>

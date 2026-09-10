@@ -82,14 +82,28 @@ class IdleTimerTest {
     }
 
     @Test
-    fun `スリープ中に操作すると復帰する`() = runTest {
+    fun `スリープ中に触れただけでは復帰しない`() = runTest {
+        // 触れただけで復帰すると、スリープ画面の解除操作を定義した意味がなくなる。
+        val appStateHolder = AppStateHolder()
+        val idleTimer = IdleTimer(appStateHolder, config, backgroundScope)
+        runCurrent()
+        idleTimer.onEnteredBackground()
+
+        idleTimer.onInteraction()
+        runCurrent()
+
+        assertTrue(appStateHolder.isSleeping.value)
+    }
+
+    @Test
+    fun `wake で復帰する`() = runTest {
         val appStateHolder = AppStateHolder()
         val idleTimer = IdleTimer(appStateHolder, config, backgroundScope)
         runCurrent()
         idleTimer.onEnteredBackground()
         assertTrue(appStateHolder.isSleeping.value)
 
-        idleTimer.onInteraction()
+        idleTimer.wake()
         runCurrent()
 
         assertFalse(appStateHolder.isSleeping.value)
