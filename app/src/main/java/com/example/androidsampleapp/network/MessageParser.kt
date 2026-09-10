@@ -38,6 +38,19 @@ class MessageParser @Inject constructor() {
                 }
             }
 
+            "NOTICE" -> {
+                val message = parts.getOrNull(2)
+                if (message.isNullOrBlank()) {
+                    DeviceMessage.Unknown(raw)
+                } else {
+                    DeviceMessage.NoticeReceived(
+                        category = parts.getOrNull(1).orEmpty(),
+                        message = message,
+                        destination = parts.getOrNull(3).orEmpty(),
+                    )
+                }
+            }
+
             "PONG" -> DeviceMessage.Pong
 
             else -> DeviceMessage.Unknown(raw)

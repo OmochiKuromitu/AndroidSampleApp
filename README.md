@@ -200,6 +200,45 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 進み具合が 1.0 に達した瞬間の 1 回だけ `SleepEffect.Wake` を出す。
 指がさらに動いても重ねて送らない。
 
+### スリープ画面の通知一覧
+
+時刻表示の下に、機器から受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
+
+通知は `TCP` の `NOTICE|<分類>|<本文>|<飛び先>` を `DeviceRepositoryImpl` が
+`AppStateHolder` に積んだもの。`SleepViewModel` は `ObserveNoticesUseCase` の
+`StateFlow` を購読するので、init の時点で今ある一覧がそのまま流れてくる。
+
+**飛び先は通知自身が持つ。**
+
+```kotlin
+data class Notice(
+    val id: String,
+    val category: NoticeCategory,   // CALL / AIRCON / ALERT / INFO。一覧ではタグとして色分け
+    val message: String,
+    val destination: NoticeDestination,   // TOP / AIRCON
+)
+```
+
+一覧側に「この分類ならここ」という対応表を持たせない。飛び先を増やすときは
+`NoticeDestination` と、そのタブへの対応（`toMainTab()`）だけを触ればよい。
+ドメインはルート文字列を知らず、変換は `ui/main` に置いてある。
+
+タップしたときの経路はこうなる。
+
+```
+NoticeClicked ─▶ Reducer（状態は変えない）
+              └▶ handle() ─▶ SleepEffect.OpenDestination
+                              └▶ AppNavigation が requestedTab に控えて idleTimer.wake()
+                                  └▶ 復帰してメイン画面が composed され、
+                                      MainIntent.TabClicked として消化される
+```
+
+タブは `MainViewModel` の状態で、`AppNavigation` からは直接触れない。そのため
+「どのタブを出したいか」だけを引数で渡し、受け取った側が 1 度だけ処理して消す。
+
+なお通知のタップは、下端スワイプを経ずに解除される唯一の経路になる。
+意図した操作なので許しているが、誤接触も通してしまう点は承知のうえ。
+
 ### 常時監視
 
 ```
@@ -231,7 +270,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視
 ├── domain/
-│   ├── model/              Aircon / ConnectionState / IncomingCall
+│   ├── model/              Aircon / ConnectionState / IncomingCall / Notice
 │   ├── repository/         DeviceRepository / AirconRepository（interface）
 │   └── usecase/            ObserveXxx / SetXxx / AnswerCall …
 ├── data/                   Repository 実装
@@ -239,7 +278,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
 └── ui/
     ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
-    ├── common/             Route / AppHeader / 共通コンポーネント / プレビュー定義
+    ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
     ├── main/               BottomNaviBar とメイン画面（MVI 6 ファイル + BottomNaviBar）
     ├── top/                メイン画面に入れる画面（MVI 6 ファイル）

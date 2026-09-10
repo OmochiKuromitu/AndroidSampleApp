@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.UiState
 import com.example.androidsampleapp.domain.model.ConnectionState
+import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.ui.common.Route
 
 /**
@@ -23,6 +24,14 @@ enum class MainTab(
     TOP(Route.TOP, R.string.tab_top, Icons.Filled.Home),
     AIRCON(Route.AIRCON, R.string.tab_aircon, Icons.Filled.AcUnit),
     SLEEP(Route.SLEEP, R.string.tab_sleep, Icons.Filled.Bedtime),
+}
+
+/**
+ * 通知の飛び先をタブに対応させる。ドメインは画面の住所を知らないので、変換はここに置く。
+ */
+fun NoticeDestination.toMainTab(): MainTab = when (this) {
+    NoticeDestination.TOP -> MainTab.TOP
+    NoticeDestination.AIRCON -> MainTab.AIRCON
 }
 
 data class MainState(

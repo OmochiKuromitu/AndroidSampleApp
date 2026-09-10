@@ -14,6 +14,12 @@ sealed interface DeviceMessage {
         val roomTemperature: Double,
     ) : DeviceMessage
 
+    data class NoticeReceived(
+        val category: String,
+        val message: String,
+        val destination: String,
+    ) : DeviceMessage
+
     data object Pong : DeviceMessage
     data class Unknown(val raw: String) : DeviceMessage
 }

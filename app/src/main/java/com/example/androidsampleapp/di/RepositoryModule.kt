@@ -2,8 +2,10 @@ package com.example.androidsampleapp.di
 
 import com.example.androidsampleapp.data.AirconRepositoryImpl
 import com.example.androidsampleapp.data.DeviceRepositoryImpl
+import com.example.androidsampleapp.data.NoticeRepositoryImpl
 import com.example.androidsampleapp.domain.repository.AirconRepository
 import com.example.androidsampleapp.domain.repository.DeviceRepository
+import com.example.androidsampleapp.domain.repository.NoticeRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -25,4 +27,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAirconRepository(impl: AirconRepositoryImpl): AirconRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNoticeRepository(impl: NoticeRepositoryImpl): NoticeRepository
 }

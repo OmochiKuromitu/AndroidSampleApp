@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -28,8 +29,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.CollectEffect
-import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
+import com.example.androidsampleapp.ui.common.NoticeList
 import com.example.androidsampleapp.ui.common.PreviewSurface
+import com.example.androidsampleapp.ui.common.TallPanelPreview
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
@@ -37,10 +42,12 @@ import com.example.androidsampleapp.ui.theme.dimensions
  *
  * 解除は画面下端の帯を上にスワイプしたときだけ。触れただけでは解除しないので、
  * 拭き掃除や誤接触で操作画面に戻らない。
+ * ただし通知をタップした場合は、意図した操作とみなして復帰と遷移をまとめて行う。
  */
 @Composable
 fun SleepScreen(
     onWake: () -> Unit,
+    onOpenDestination: (NoticeDestination) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SleepViewModel = hiltViewModel(),
 ) {
@@ -49,6 +56,7 @@ fun SleepScreen(
     CollectEffect(viewModel.effect) { effect ->
         when (effect) {
             SleepEffect.Wake -> onWake()
+            is SleepEffect.OpenDestination -> onOpenDestination(effect.destination)
         }
     }
 
@@ -61,14 +69,23 @@ private fun SleepContent(
     onIntent: (SleepIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val dimensions = MaterialTheme.dimensions
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
         Column(
-            modifier = Modifier.align(Alignment.Center),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = dimensions.sleepClockTop,
+                    start = dimensions.spaceLarge,
+                    end = dimensions.spaceLarge,
+                    // 解除エリアに隠れてタップできない行が出ないよう、下を空けておく。
+                    bottom = dimensions.unlockAreaHeight,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -80,6 +97,14 @@ private fun SleepContent(
                 text = state.dateText,
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White.copy(alpha = 0.7f),
+            )
+
+            NoticeList(
+                notices = state.notices,
+                onNoticeClick = { onIntent(SleepIntent.NoticeClicked(it)) },
+                onClearClick = { onIntent(SleepIntent.ClearNoticesClicked) },
+                contentColor = Color.White,
+                modifier = Modifier.padding(top = dimensions.spaceLarge),
             )
         }
 
@@ -159,9 +184,31 @@ private fun UnlockHint(progress: Float, travel: Dp) {
 private const val HINT_FOLLOW_RATIO = 0.3f
 private const val HINT_MIN_ALPHA = 0.35f
 
-@PanelPreview
+private val previewNotices = listOf(
+    Notice("1", NoticeCategory.CALL, "玄関からの呼び出しに応答がありませんでした", NoticeDestination.TOP),
+    Notice("2", NoticeCategory.ALERT, "フィルターの清掃時期です", NoticeDestination.AIRCON),
+    Notice("3", NoticeCategory.AIRCON, "リビングの設定温度を 26.0 度に変更しました", NoticeDestination.AIRCON),
+    Notice("4", NoticeCategory.INFO, "システムを起動しました", NoticeDestination.TOP),
+)
+
+@TallPanelPreview
 @Composable
 private fun SleepContentPreview() {
+    PreviewSurface {
+        SleepContent(
+            state = SleepState(
+                timeText = "21:47",
+                dateText = "9月10日 (水)",
+                notices = previewNotices,
+            ),
+            onIntent = {},
+        )
+    }
+}
+
+@TallPanelPreview
+@Composable
+private fun SleepContentEmptyPreview() {
     PreviewSurface {
         SleepContent(
             state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
@@ -170,7 +217,7 @@ private fun SleepContentPreview() {
     }
 }
 
-@PanelPreview
+@TallPanelPreview
 @Composable
 private fun SleepContentSwipingPreview() {
     PreviewSurface {
@@ -178,6 +225,7 @@ private fun SleepContentSwipingPreview() {
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
+                notices = previewNotices,
                 unlockProgress = 0.7f,
             ),
             onIntent = {},

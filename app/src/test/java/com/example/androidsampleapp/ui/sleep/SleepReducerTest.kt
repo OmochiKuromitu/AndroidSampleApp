@@ -1,5 +1,8 @@
 package com.example.androidsampleapp.ui.sleep
 
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -55,6 +58,41 @@ class SleepReducerTest {
 
         assertEquals(0.5f, next.unlockProgress, TOLERANCE)
         assertEquals("12:34", next.timeText)
+    }
+
+    @Test
+    fun `受け取った通知が入る`() {
+        val notices = listOf(
+            Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
+        )
+
+        val next = reducer.reduce(SleepState(), SleepIntent.NoticesChanged(notices))
+
+        assertEquals(notices, next.notices)
+    }
+
+    @Test
+    fun `消去を押した時点では一覧を書き換えない`() {
+        // 実際に消えたかどうかは NoticesChanged で戻ってくる。先読みしない。
+        val state = SleepState(
+            notices = listOf(
+                Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
+            ),
+        )
+
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesClicked)
+
+        assertEquals(state, next)
+    }
+
+    @Test
+    fun `通知のタップは状態を変えない`() {
+        val notice = Notice("1", NoticeCategory.AIRCON, "設定温度を変更", NoticeDestination.AIRCON)
+        val state = SleepState(notices = listOf(notice))
+
+        val next = reducer.reduce(state, SleepIntent.NoticeClicked(notice))
+
+        assertEquals(state, next)
     }
 
     private companion object {

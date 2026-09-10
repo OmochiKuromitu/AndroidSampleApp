@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -15,6 +18,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.androidsampleapp.core.AppStateHolder
 import com.example.androidsampleapp.ui.common.Route
 import com.example.androidsampleapp.ui.main.MainScreen
+import com.example.androidsampleapp.ui.main.MainTab
+import com.example.androidsampleapp.ui.main.toMainTab
 import com.example.androidsampleapp.ui.sleep.SleepScreen
 
 /**
@@ -29,6 +34,10 @@ fun AppNavigation(
 ) {
     val navController = rememberNavController()
     val isSleeping by idleTimer.isSleeping.collectAsStateWithLifecycle()
+
+    // スリープ画面で通知をタップしたときの行き先。復帰後にメイン画面が受け取って消す。
+    // タブは MainViewModel の状態なので、ここからは「どのタブを出したいか」だけを渡す。
+    var requestedTab by remember { mutableStateOf<MainTab?>(null) }
 
     IncomingCallRouter(appStateHolder = appStateHolder, idleTimer = idleTimer)
 
@@ -56,10 +65,20 @@ fun AppNavigation(
     ) {
         NavHost(navController = navController, startDestination = Route.MAIN) {
             composable(Route.MAIN) {
-                MainScreen(onNavigateToSleep = { idleTimer.onSleepRequested() })
+                MainScreen(
+                    onNavigateToSleep = { idleTimer.onSleepRequested() },
+                    requestedTab = requestedTab,
+                    onRequestedTabConsumed = { requestedTab = null },
+                )
             }
             composable(Route.SLEEP) {
-                SleepScreen(onWake = { idleTimer.wake() })
+                SleepScreen(
+                    onWake = { idleTimer.wake() },
+                    onOpenDestination = { destination ->
+                        requestedTab = destination.toMainTab()
+                        idleTimer.wake()
+                    },
+                )
             }
         }
     }

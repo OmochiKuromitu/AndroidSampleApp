@@ -3,6 +3,7 @@ package com.example.androidsampleapp.core
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
+import com.example.androidsampleapp.domain.model.Notice
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,9 @@ class AppStateHolder @Inject constructor() {
     private val _aircon = MutableStateFlow(Aircon())
     val aircon: StateFlow<Aircon> = _aircon.asStateFlow()
 
+    private val _notices = MutableStateFlow<List<Notice>>(emptyList())
+    val notices: StateFlow<List<Notice>> = _notices.asStateFlow()
+
     fun updateConnectionState(state: ConnectionState) {
         _connectionState.value = state
     }
@@ -41,5 +45,18 @@ class AppStateHolder @Inject constructor() {
 
     fun updateAircon(transform: (Aircon) -> Aircon) {
         _aircon.update(transform)
+    }
+
+    /** 新しいものを先頭に積む。溜め続けないよう上限で切る。 */
+    fun addNotice(notice: Notice) {
+        _notices.update { current -> (listOf(notice) + current).take(MAX_NOTICES) }
+    }
+
+    fun clearNotices() {
+        _notices.value = emptyList()
+    }
+
+    private companion object {
+        const val MAX_NOTICES = 50
     }
 }

@@ -5,6 +5,9 @@ import com.example.androidsampleapp.core.AppStateHolder
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.domain.repository.DeviceRepository
 import com.example.androidsampleapp.model.CommandRequest
 import com.example.androidsampleapp.model.DeviceMessage
@@ -32,6 +35,8 @@ class DeviceRepositoryImpl @Inject constructor(
     private val appStateHolder: AppStateHolder,
     private val config: AppConfig,
 ) : DeviceRepository {
+
+    private var noticeSequence = 0L
 
     override val connectionState = appStateHolder.connectionState
     override val incomingCall = appStateHolder.incomingCall
@@ -95,6 +100,16 @@ class DeviceRepositoryImpl @Inject constructor(
                 )
             }
 
+            is DeviceMessage.NoticeReceived -> appStateHolder.addNotice(
+                Notice(
+                    // 機器側は id を振らないので、受信順に一意な値を作る。
+                    id = "notice-${noticeSequence++}",
+                    category = NoticeCategory.fromCode(message.category),
+                    message = message.message,
+                    destination = NoticeDestination.fromCode(message.destination),
+                ),
+            )
+
             DeviceMessage.Pong,
             is DeviceMessage.Unknown,
             -> Unit
@@ -105,6 +120,10 @@ class DeviceRepositoryImpl @Inject constructor(
     private fun fakeEvents(): Flow<TcpClient.Event> = flow {
         emit(TcpClient.Event.Connected)
         emit(TcpClient.Event.Line("AIRCON|ON|COOL|26.0|28.4"))
+        emit(TcpClient.Event.Line("NOTICE|INFO|システムを起動しました|TOP"))
+        emit(TcpClient.Event.Line("NOTICE|AIRCON|リビングの設定温度を 26.0 度に変更しました|AIRCON"))
+        emit(TcpClient.Event.Line("NOTICE|ALERT|フィルターの清掃時期です|AIRCON"))
+        emit(TcpClient.Event.Line("NOTICE|CALL|玄関からの呼び出しに応答がありませんでした|TOP"))
         delay(FAKE_CALL_DELAY_MS)
         emit(TcpClient.Event.Line("CALL|101|玄関"))
         while (currentCoroutineContext().isActive) {

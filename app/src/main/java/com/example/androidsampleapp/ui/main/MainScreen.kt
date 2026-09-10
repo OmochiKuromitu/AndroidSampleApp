@@ -40,6 +40,8 @@ import com.example.androidsampleapp.ui.top.TopScreen
 @Composable
 fun MainScreen(
     onNavigateToSleep: () -> Unit,
+    requestedTab: MainTab?,
+    onRequestedTabConsumed: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
@@ -63,6 +65,14 @@ fun MainScreen(
     LaunchedEffect(currentTab) {
         if (currentTab != null && currentTab != state.selectedTab) {
             viewModel.dispatch(MainIntent.BackStackChanged(currentTab))
+        }
+    }
+
+    // スリープ画面で通知をタップして戻ってきたときの行き先。受け取ったら 1 度だけ処理する。
+    LaunchedEffect(requestedTab) {
+        if (requestedTab != null) {
+            viewModel.dispatch(MainIntent.TabClicked(requestedTab))
+            onRequestedTabConsumed()
         }
     }
 

@@ -2,7 +2,9 @@ package com.example.androidsampleapp.ui.sleep
 
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.core.mvi.MviViewModel
+import com.example.androidsampleapp.domain.usecase.ClearNoticesUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveConnectionStateUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveNoticesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -15,6 +17,8 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SleepViewModel @Inject constructor(
     observeConnectionState: ObserveConnectionStateUseCase,
+    observeNotices: ObserveNoticesUseCase,
+    private val clearNotices: ClearNoticesUseCase,
 ) : MviViewModel<SleepState, SleepIntent, SleepEffect>(
     initialState = SleepState(),
     reducer = SleepReducer(),
@@ -34,6 +38,10 @@ class SleepViewModel @Inject constructor(
         viewModelScope.launch {
             observeConnectionState().collect { dispatch(SleepIntent.ConnectionStateChanged(it)) }
         }
+        // StateFlow なので、購読した時点で今ある一覧がそのまま流れてくる。
+        viewModelScope.launch {
+            observeNotices().collect { dispatch(SleepIntent.NoticesChanged(it)) }
+        }
     }
 
     override suspend fun handle(intent: SleepIntent, previous: SleepState, current: SleepState) {
@@ -44,9 +52,15 @@ class SleepViewModel @Inject constructor(
                     sendEffect(SleepEffect.Wake)
                 }
 
+            is SleepIntent.NoticeClicked ->
+                sendEffect(SleepEffect.OpenDestination(intent.notice.destination))
+
+            SleepIntent.ClearNoticesClicked -> clearNotices()
+
             SleepIntent.UnlockCancelled,
             is SleepIntent.Ticked,
             is SleepIntent.ConnectionStateChanged,
+            is SleepIntent.NoticesChanged,
             -> Unit
         }
     }
