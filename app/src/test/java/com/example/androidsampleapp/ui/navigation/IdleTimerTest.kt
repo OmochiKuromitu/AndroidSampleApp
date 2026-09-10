@@ -35,6 +35,18 @@ class IdleTimerTest {
     }
 
     @Test
+    fun `画面が消えるとスリープになる`() = runTest {
+        val appStateHolder = AppStateHolder()
+        val idleTimer = IdleTimer(appStateHolder, config, backgroundScope)
+        runCurrent()
+        assertFalse(appStateHolder.isSleeping.value)
+
+        idleTimer.onScreenOff()
+
+        assertTrue(appStateHolder.isSleeping.value)
+    }
+
+    @Test
     fun `無操作がタイムアウトするとスリープになる`() = runTest {
         val appStateHolder = AppStateHolder()
         IdleTimer(appStateHolder, config, backgroundScope)

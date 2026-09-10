@@ -109,19 +109,29 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 ### スリープに入る条件
 
 判断は `ui/navigation/IdleTimer` が一手に持ち、`AppStateHolder.isSleeping` を立てるだけ。
-遷移は、それを見た `AppNavigation` が行う。条件は 2 つ。
+遷移は、それを見た `AppNavigation` が行う。きっかけは 3 つ。
 
 | きっかけ | 呼ぶもの | 挙動 |
 | --- | --- | --- |
 | 無操作が続いた | 内部タイマー（`AppConfig.sleepTimeout`） | タイムアウトでスリープ |
 | バックグラウンドに移った | `IdleTimer.onEnteredBackground()` | 無操作時間に関係なく即スリープ |
+| 画面が消えた（電源ボタン / 消灯タイムアウト） | `IdleTimer.onScreenOff()` | 復帰後もスリープ画面から始まる |
 
 操作の検知は `AppNavigation` のルートに置いた `pointerInput` が担う。
 `PointerEventPass.Initial` で子より先に覗くだけなので、画面側の操作は妨げない。
 
-バックグラウンド移行は `App` が `ProcessLifecycleOwner` の `ON_STOP` で拾う。
-Activity の `onStop` を使わないのは、画面回転による再生成でも呼ばれてしまうから。
-`ProcessLifecycleOwner` は構成変更を除外するので、回転ではスリープに落ちない。
+きっかけの検知は `App` が 2 系統でやっている。
+
+- **他アプリへの移動** — `ProcessLifecycleOwner` の `ON_STOP`。
+  Activity の `onStop` を使わないのは、画面回転による再生成でも呼ばれてしまうから。
+  `ProcessLifecycleOwner` は構成変更を除外するので、回転ではスリープに落ちない。
+- **画面消灯** — `ACTION_SCREEN_OFF` のブロードキャスト。
+
+キオスク（Device Owner + LockTask）で電源ボタンを押して消灯し、すぐ復帰する経路は
+`ON_STOP` だけでは取りこぼす。`ON_STOP` は構成変更を吸収するため約 700ms 遅れて飛び、
+その間に復帰すると打ち消されるため。`ACTION_SCREEN_OFF` は遅延なく届くので、
+この経路はこちらで拾う。なおこのアクションは manifest 登録では受け取れないので、
+`App.onCreate` で実行時に登録している。
 
 復帰したときではなく離れたときに倒しているのは、復帰時に判定すると遷移が走るまでの
 1 フレームだけ前の画面が見えることがあるため。離れる時点で倒しておけば、
@@ -209,6 +219,7 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
 - 通知権限（Android 13 以降の `POST_NOTIFICATIONS`）の実行時リクエストは未実装。
   権限が無いと前面サービスの通知が出ないだけで、監視自体は動く。
 - `ProcessLifecycleOwner` の `ON_STOP` は約 700ms 遅れて飛ぶ（構成変更を吸収するため）。
-  これより短い離席は「バックグラウンドに移った」と扱われない。
+  これより短い他アプリへの移動は「バックグラウンドに移った」と扱われない。
+  画面消灯の経路は `ACTION_SCREEN_OFF` で拾うのでこの影響を受けない。
 - プロセスが破棄されてからの再起動は、状態が初期値に戻るためスリープ画面から始まらない。
   それも必ずスリープにしたいなら、初期値を `isSleeping = true` にする。
