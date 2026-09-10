@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.update
  *
  * 書き込んでよいのは data 層（機器からの受信を反映する DeviceRepositoryImpl）と
  * ui/navigation の IdleTimer だけ。画面や ViewModel からは読むだけにする。
- * 画面ごとの状態は各 ui/<feature>/*State が持ち、ここには置かない。
+ * 画面ごとの状態は各画面の XxxState が持ち、ここには置かない。
  */
 @Singleton
 class AppStateHolder @Inject constructor() {
