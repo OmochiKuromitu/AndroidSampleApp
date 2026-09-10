@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * 全画面が共有する状態の単一管理者。
+ * 機器から降ってくる状態の単一管理者。全画面がここを見る。
  *
- * 書き込んでよいのは data 層（機器からの受信を反映する DeviceRepositoryImpl）と
- * ui/navigation の IdleTimer だけ。画面や ViewModel からは読むだけにする。
- * 画面ごとの状態は各画面の XxxState が持ち、ここには置かない。
+ * 書き込んでよいのは data 層（受信を反映する DeviceRepositoryImpl）だけ。
+ * 画面や ViewModel からは読むだけにする。
+ *
+ * ここに置くのは「機器の状態」に限る。画面ごとの状態は各画面の XxxState が持ち、
+ * スリープ中かどうかは唯一の書き手である IdleTimer が自分で持つ。
  */
 @Singleton
 class AppStateHolder @Inject constructor() {
@@ -29,9 +31,6 @@ class AppStateHolder @Inject constructor() {
     private val _aircon = MutableStateFlow(Aircon())
     val aircon: StateFlow<Aircon> = _aircon.asStateFlow()
 
-    private val _isSleeping = MutableStateFlow(false)
-    val isSleeping: StateFlow<Boolean> = _isSleeping.asStateFlow()
-
     fun updateConnectionState(state: ConnectionState) {
         _connectionState.value = state
     }
@@ -42,9 +41,5 @@ class AppStateHolder @Inject constructor() {
 
     fun updateAircon(transform: (Aircon) -> Aircon) {
         _aircon.update(transform)
-    }
-
-    fun updateSleeping(isSleeping: Boolean) {
-        _isSleeping.value = isSleeping
     }
 }

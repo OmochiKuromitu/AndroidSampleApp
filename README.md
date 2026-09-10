@@ -127,25 +127,32 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 
 ### 共有状態 — AppStateHolder
 
-接続状態・着信・エアコンの現在値・スリープ中かどうかは、全画面が見る。
-これを `core/AppStateHolder` が単独で持つ。
+接続状態・着信・エアコンの現在値は、全画面が見る。これを `core/AppStateHolder` が単独で持つ。
 
-- **書き込むのは 2 か所だけ** — 受信を反映する `data/DeviceRepositoryImpl` と、
-  無操作を検知する `ui/navigation/IdleTimer`。
+- **書き込むのは 1 か所だけ** — 受信を反映する `data/DeviceRepositoryImpl`。
 - 画面と ViewModel は読むだけ。UseCase 経由で `StateFlow` を受け取り、
   変化を Intent に変換して自分の Reducer に流す。
 - 画面固有の状態（送信中フラグなど）はここに置かず、各 `XxxState` が持つ。
 
+ここに置くのは **機器から降ってくる状態** に限る。「全画面が見る値だから」で
+何でも入れると、書き手が増えて所在が追えなくなる。判断の目安は書き手と読み手の数。
+
+スリープ中かどうかがその例で、これは `AppStateHolder` ではなく `IdleTimer` が自分で持つ。
+書き手は `IdleTimer` だけ、読み手も `AppNavigation` だけなので、共有の器を通す理由がない。
+通すと、状態を持つ場所と更新を決める場所が分かれてしまい、
+`IdleTimer` を読むだけではスリープの挙動が追えなくなる。
+
 ### スリープに入る条件
 
-判断は `ui/navigation/IdleTimer` が一手に持ち、`AppStateHolder.isSleeping` を立てるだけ。
-遷移は、それを見た `AppNavigation` が行う。きっかけは 3 つ。
+状態と判断は `ui/navigation/IdleTimer` が一手に持ち、`isSleeping` を立てるだけ。
+遷移は、それを見た `AppNavigation` が行う。きっかけは 4 つ。
 
 | きっかけ | 呼ぶもの | 挙動 |
 | --- | --- | --- |
 | 無操作が続いた | 内部タイマー（`AppConfig.sleepTimeout`） | タイムアウトでスリープ |
 | バックグラウンドに移った | `IdleTimer.onEnteredBackground()` | 無操作時間に関係なく即スリープ |
 | 画面が消えた（電源ボタン / 消灯タイムアウト） | `IdleTimer.onScreenOff()` | 復帰後もスリープ画面から始まる |
+| スリープタブが選ばれた | `IdleTimer.onSleepRequested()` | 即スリープ |
 
 操作の検知は `AppNavigation` のルートに置いた `pointerInput` が担う。
 `PointerEventPass.Initial` で子より先に覗くだけなので、画面側の操作は妨げない。
@@ -278,4 +285,4 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
   これより短い他アプリへの移動は「バックグラウンドに移った」と扱われない。
   画面消灯の経路は `ACTION_SCREEN_OFF` で拾うのでこの影響を受けない。
 - プロセスが破棄されてからの再起動は、状態が初期値に戻るためスリープ画面から始まらない。
-  それも必ずスリープにしたいなら、初期値を `isSleeping = true` にする。
+  それも必ずスリープにしたいなら、`IdleTimer` の `_isSleeping` の初期値を `true` にする。

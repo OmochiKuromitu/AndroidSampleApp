@@ -28,7 +28,7 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
-    val isSleeping by appStateHolder.isSleeping.collectAsStateWithLifecycle()
+    val isSleeping by idleTimer.isSleeping.collectAsStateWithLifecycle()
 
     IncomingCallRouter(appStateHolder = appStateHolder, idleTimer = idleTimer)
 
@@ -56,7 +56,7 @@ fun AppNavigation(
     ) {
         NavHost(navController = navController, startDestination = Route.MAIN) {
             composable(Route.MAIN) {
-                MainScreen(onNavigateToSleep = { appStateHolder.updateSleeping(true) })
+                MainScreen(onNavigateToSleep = { idleTimer.onSleepRequested() })
             }
             composable(Route.SLEEP) {
                 SleepScreen(onWake = { idleTimer.wake() })
