@@ -21,11 +21,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.CollectEffect
 import com.example.androidsampleapp.domain.model.Aircon
+import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.IncomingCall
 import com.example.androidsampleapp.ui.common.CenteredMessage
 import com.example.androidsampleapp.ui.common.PanelButton
+import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
+/**
+ * ViewModel と Effect の受け口。描画は [TopContent] が担う。
+ * 分けてあるのは、プレビューで Hilt の ViewModel を解決できないため。
+ */
 @Composable
 fun TopScreen(
     snackbarHostState: SnackbarHostState,
@@ -42,6 +49,15 @@ fun TopScreen(
         }
     }
 
+    TopContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+}
+
+@Composable
+private fun TopContent(
+    state: TopState,
+    onIntent: (TopIntent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -53,8 +69,8 @@ fun TopScreen(
             IncomingCallCard(
                 call = call,
                 enabled = !state.isSendingCommand,
-                onAnswer = { viewModel.dispatch(TopIntent.AnswerClicked) },
-                onReject = { viewModel.dispatch(TopIntent.RejectClicked) },
+                onAnswer = { onIntent(TopIntent.AnswerClicked) },
+                onReject = { onIntent(TopIntent.RejectClicked) },
             )
         }
 
@@ -134,5 +150,51 @@ private fun AirconSummaryCard(aircon: Aircon) {
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+    }
+}
+
+@PanelPreview
+@Composable
+private fun TopContentIdlePreview() {
+    PreviewSurface {
+        TopContent(
+            state = TopState(
+                aircon = Aircon(
+                    isOn = true,
+                    mode = AirconMode.COOL,
+                    targetTemperature = 26.0,
+                    roomTemperature = 28.4,
+                ),
+            ),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun TopContentIncomingCallPreview() {
+    PreviewSurface {
+        TopContent(
+            state = TopState(
+                incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
+                aircon = Aircon(isOn = false, roomTemperature = 24.1),
+            ),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun TopContentSendingPreview() {
+    PreviewSurface {
+        TopContent(
+            state = TopState(
+                incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
+                isSendingCommand = true,
+            ),
+            onIntent = {},
+        )
     }
 }

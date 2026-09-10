@@ -28,6 +28,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.CollectEffect
+import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
@@ -50,6 +52,15 @@ fun SleepScreen(
         }
     }
 
+    SleepContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+}
+
+@Composable
+private fun SleepContent(
+    state: SleepState,
+    onIntent: (SleepIntent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -74,8 +85,8 @@ fun SleepScreen(
 
         UnlockArea(
             progress = state.unlockProgress,
-            onProgress = { viewModel.dispatch(SleepIntent.UnlockDragged(it)) },
-            onCancel = { viewModel.dispatch(SleepIntent.UnlockCancelled) },
+            onProgress = { onIntent(SleepIntent.UnlockDragged(it)) },
+            onCancel = { onIntent(SleepIntent.UnlockCancelled) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
@@ -147,3 +158,29 @@ private fun UnlockHint(progress: Float, travel: Dp) {
 /** ヒントは指の移動量そのままではなく、控えめに追従させる。 */
 private const val HINT_FOLLOW_RATIO = 0.3f
 private const val HINT_MIN_ALPHA = 0.35f
+
+@PanelPreview
+@Composable
+private fun SleepContentPreview() {
+    PreviewSurface {
+        SleepContent(
+            state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepContentSwipingPreview() {
+    PreviewSurface {
+        SleepContent(
+            state = SleepState(
+                timeText = "21:47",
+                dateText = "9月10日 (水)",
+                unlockProgress = 0.7f,
+            ),
+            onIntent = {},
+        )
+    }
+}

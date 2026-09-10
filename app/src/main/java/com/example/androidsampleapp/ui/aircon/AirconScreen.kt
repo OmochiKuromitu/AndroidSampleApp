@@ -27,9 +27,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.CollectEffect
+import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
+import com.example.androidsampleapp.domain.model.ConnectionState
+import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
+/**
+ * ViewModel と Effect の受け口。描画は [AirconContent] が担う。
+ */
 @Composable
 fun AirconScreen(
     snackbarHostState: SnackbarHostState,
@@ -46,6 +53,15 @@ fun AirconScreen(
         }
     }
 
+    AirconContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+}
+
+@Composable
+private fun AirconContent(
+    state: AirconState,
+    onIntent: (AirconIntent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -68,7 +84,7 @@ fun AirconScreen(
             Text(stringResource(R.string.aircon_power), style = MaterialTheme.typography.titleLarge)
             Switch(
                 checked = state.aircon.isOn,
-                onCheckedChange = { viewModel.dispatch(AirconIntent.PowerToggled(it)) },
+                onCheckedChange = { onIntent(AirconIntent.PowerToggled(it)) },
                 enabled = state.isOperable,
             )
         }
@@ -81,8 +97,8 @@ fun AirconScreen(
         TemperatureControl(
             targetTemperature = state.aircon.targetTemperature,
             enabled = state.isOperable && state.aircon.isOn,
-            onDown = { viewModel.dispatch(AirconIntent.TemperatureDownClicked) },
-            onUp = { viewModel.dispatch(AirconIntent.TemperatureUpClicked) },
+            onDown = { onIntent(AirconIntent.TemperatureDownClicked) },
+            onUp = { onIntent(AirconIntent.TemperatureUpClicked) },
         )
 
         Text(stringResource(R.string.aircon_mode), style = MaterialTheme.typography.titleLarge)
@@ -90,7 +106,7 @@ fun AirconScreen(
             AirconMode.entries.forEach { mode ->
                 FilterChip(
                     selected = mode == state.aircon.mode,
-                    onClick = { viewModel.dispatch(AirconIntent.ModeSelected(mode)) },
+                    onClick = { onIntent(AirconIntent.ModeSelected(mode)) },
                     enabled = state.isOperable && state.aircon.isOn,
                     label = { Text(mode.label) },
                 )
@@ -137,5 +153,49 @@ private fun TemperatureControl(
                 contentDescription = stringResource(R.string.aircon_temperature_up),
             )
         }
+    }
+}
+
+@PanelPreview
+@Composable
+private fun AirconContentRunningPreview() {
+    PreviewSurface {
+        AirconContent(
+            state = AirconState(
+                aircon = Aircon(
+                    isOn = true,
+                    mode = AirconMode.COOL,
+                    targetTemperature = 26.0,
+                    roomTemperature = 28.4,
+                ),
+                connectionState = ConnectionState.CONNECTED,
+            ),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun AirconContentStoppedPreview() {
+    PreviewSurface {
+        AirconContent(
+            state = AirconState(
+                aircon = Aircon(isOn = false, roomTemperature = 22.0),
+                connectionState = ConnectionState.CONNECTED,
+            ),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun AirconContentOfflinePreview() {
+    PreviewSurface {
+        AirconContent(
+            state = AirconState(connectionState = ConnectionState.DISCONNECTED),
+            onIntent = {},
+        )
     }
 }

@@ -75,6 +75,36 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
 | `XxxScreen.kt` | Composable。State を描き、Intent を投げ、Effect を受ける |
 
+`XxxScreen.kt` の中はさらに 2 つに割ってある。
+
+- `XxxScreen` — `hiltViewModel()` で ViewModel を取り、Effect を受ける。配線だけ。
+- `XxxContent` — `state` と `onIntent: (Intent) -> Unit` だけを受け取る private な Composable。
+
+割ってあるのはプレビューのため。`hiltViewModel()` はプレビューでは解決できないので、
+`XxxScreen` そのものは描画できない。状態を引数で渡せる `XxxContent` に
+`@PanelPreview` を付けて、State を差し替えながら見た目を確認する。
+
+```kotlin
+@PanelPreview
+@Composable
+private fun AirconContentOfflinePreview() {
+    PreviewSurface {
+        AirconContent(
+            state = AirconState(connectionState = ConnectionState.DISCONNECTED),
+            onIntent = {},
+        )
+    }
+}
+```
+
+`PanelPreview` と `PreviewSurface` は `ui/common/Previews.kt` にある。
+前者は壁付けパネル想定の横長サイズでライトとダークを並べる複合アノテーション、
+後者はテーマと背景色を実機と揃えるための下敷き。`AppTheme` を通さないと
+`Dimensions` とタイポグラフィが既定値になり、実機と違う見た目のまま調整してしまう。
+
+現在は 4 画面に 10 個のプレビューがある（着信あり / 待機中、運転中 / 停止中 / 未接続、
+スリープ / スワイプ中、接続あり / 切断）。それぞれライトとダークで描かれる。
+
 土台は `core/mvi/` にある（`Mvi.kt` / `MviViewModel.kt` / `CollectEffect.kt`）。
 `MviViewModel` は Intent を 1 本のチャネルに集約し、到着順に reduce する。
 副作用だけは並行に走らせて、長い I/O が後続 Intent の reduce を止めないようにしている。
@@ -202,7 +232,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
 └── ui/
     ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
-    ├── common/             Route / AppHeader / 共通コンポーネント
+    ├── common/             Route / AppHeader / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
     ├── main/               BottomNaviBar とメイン画面（MVI 6 ファイル + BottomNaviBar）
     ├── top/                メイン画面に入れる画面（MVI 6 ファイル）

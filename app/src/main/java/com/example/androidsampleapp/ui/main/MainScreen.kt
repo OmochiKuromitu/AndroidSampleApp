@@ -22,14 +22,20 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.androidsampleapp.core.mvi.CollectEffect
+import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.ui.aircon.AirconScreen
 import com.example.androidsampleapp.ui.common.AppHeader
+import com.example.androidsampleapp.ui.common.CenteredMessage
+import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.common.Route
 import com.example.androidsampleapp.ui.top.TopScreen
 
 /**
  * 下部バーを持つメイン画面。タブの中身は内側の NavHost が持ち、
  * スリープ画面だけは外側（AppNavigation）のルートへ抜ける。
+ *
+ * NavController まわりの配線はここに置き、枠の描画は [MainContent] に分けてある。
  */
 @Composable
 fun MainScreen(
@@ -60,13 +66,38 @@ fun MainScreen(
         }
     }
 
+    MainContent(
+        state = state,
+        onIntent = viewModel::dispatch,
+        snackbarHostState = snackbarHostState,
+        modifier = modifier,
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = Route.TOP,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            composable(Route.TOP) { TopScreen(snackbarHostState = snackbarHostState) }
+            composable(Route.AIRCON) { AirconScreen(snackbarHostState = snackbarHostState) }
+        }
+    }
+}
+
+@Composable
+private fun MainContent(
+    state: MainState,
+    onIntent: (MainIntent) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             BottomNaviBar(
                 selectedTab = state.selectedTab,
-                onTabClick = { viewModel.dispatch(MainIntent.TabClicked(it)) },
+                onTabClick = { onIntent(MainIntent.TabClicked(it)) },
             )
         },
     ) { innerPadding ->
@@ -75,14 +106,7 @@ fun MainScreen(
                 title = stringResource(state.selectedTab.labelRes),
                 connectionState = state.connectionState,
             )
-            NavHost(
-                navController = navController,
-                startDestination = Route.TOP,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                composable(Route.TOP) { TopScreen(snackbarHostState = snackbarHostState) }
-                composable(Route.AIRCON) { AirconScreen(snackbarHostState = snackbarHostState) }
-            }
+            content()
         }
     }
 }
@@ -93,5 +117,39 @@ private fun NavHostController.navigateToTab(tab: MainTab) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+@PanelPreview
+@Composable
+private fun MainContentConnectedPreview() {
+    PreviewSurface {
+        MainContent(
+            state = MainState(
+                selectedTab = MainTab.TOP,
+                connectionState = ConnectionState.CONNECTED,
+            ),
+            onIntent = {},
+            snackbarHostState = remember { SnackbarHostState() },
+        ) {
+            CenteredMessage(message = "タブの中身")
+        }
+    }
+}
+
+@PanelPreview
+@Composable
+private fun MainContentDisconnectedPreview() {
+    PreviewSurface {
+        MainContent(
+            state = MainState(
+                selectedTab = MainTab.AIRCON,
+                connectionState = ConnectionState.DISCONNECTED,
+            ),
+            onIntent = {},
+            snackbarHostState = remember { SnackbarHostState() },
+        ) {
+            CenteredMessage(message = "タブの中身")
+        }
     }
 }
