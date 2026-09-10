@@ -9,6 +9,9 @@ Jetpack Compose + MVI の Android アプリ。壁付けの操作パネルを想�
 
 ## ビルド
 
+壁付けパネル想定のため **縦固定**（`android:screenOrientation="portrait"`）。
+プレビューの寸法も縦長にしてある。
+
 Android Studio でこのディレクトリを開く。実行構成は 4 つ（mock/product × debug/release）。
 実機が手元に無いときは **mockDebug** を選ぶ。擬似デバイスが接続・エアコン状態・着信を流す。
 
@@ -168,8 +171,9 @@ NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）�
 きっかけの検知は `App` が 2 系統でやっている。
 
 - **他アプリへの移動** — `ProcessLifecycleOwner` の `ON_STOP`。
-  Activity の `onStop` を使わないのは、画面回転による再生成でも呼ばれてしまうから。
-  `ProcessLifecycleOwner` は構成変更を除外するので、回転ではスリープに落ちない。
+  Activity の `onStop` を使わないのは、構成変更（画面サイズ、ロケール、
+  ダークテーマの切り替えなど）による再生成でも呼ばれてしまうから。
+  `ProcessLifecycleOwner` は構成変更を除外する。
 - **画面消灯** — `ACTION_SCREEN_OFF` のブロードキャスト。
 
 キオスク（Device Owner + LockTask）で電源ボタンを押して消灯し、すぐ復帰する経路は

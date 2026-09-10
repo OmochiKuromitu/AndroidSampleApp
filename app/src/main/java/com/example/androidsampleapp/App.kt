@@ -29,8 +29,9 @@ class App : Application() {
      * バックグラウンドに移ったらスリープにする。他アプリへ移った場合を拾う。
      *
      * Activity の onStop ではなく ProcessLifecycleOwner を見るのは、
-     * 画面回転による再生成では ON_STOP が飛ばないため。Activity で拾うと
-     * 回転しただけでスリープに落ちてしまう。
+     * 構成変更（画面サイズ、ロケール、ダークテーマの切り替えなど）による
+     * 再生成では ON_STOP が飛ばないため。Activity で拾うと、
+     * 画面が変わっていないのにスリープへ落ちる。
      */
     private fun observeProcessLifecycle() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(

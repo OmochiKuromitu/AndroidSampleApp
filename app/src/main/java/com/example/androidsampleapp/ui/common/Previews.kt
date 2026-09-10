@@ -8,14 +8,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.androidsampleapp.ui.theme.AppTheme
 
 /**
- * 壁付けパネル想定の横長サイズで、ライトとダークを並べて出す。
+ * 壁付けパネル想定の縦長サイズで、ライトとダークを並べて出す。
  * 画面ごとに @Preview を書き分けず、これを付ける。
+ *
+ * 実機の寸法に合わせるときはこの 2 行の dp を直す。全画面のプレビューに効く。
  */
-@Preview(name = "Light", widthDp = 800, heightDp = 480, showBackground = true)
+@Preview(name = "Light", widthDp = 480, heightDp = 800, showBackground = true)
 @Preview(
     name = "Dark",
-    widthDp = 800,
-    heightDp = 480,
+    widthDp = 480,
+    heightDp = 800,
     showBackground = true,
     uiMode = Configuration.UI_MODE_NIGHT_YES,
 )
