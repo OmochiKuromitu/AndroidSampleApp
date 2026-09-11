@@ -147,7 +147,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 
 | 窓口 | 中身 | 使う場所 |
 | --- | --- | --- |
-| `SleepControlViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
+| `IdleTimerViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
 | `IncomingCallViewModel` | 着信の `StateFlow` | `IncomingCallRouter` |
 
 「`AppNavigation` が必要とするもの」という 1 つの入れ物にまとめない。それは責務ではなく、
@@ -331,7 +331,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
 └── ui/
     ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
-    │                       + 責務ごとの窓口 ViewModel（SleepControl / IncomingCall）
+    │                       + 責務ごとの窓口 ViewModel（IdleTimer / IncomingCall）
     ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
     ├── main/               ヘッダーと BottomNaviBar の枠（MVI 6 ファイル + BottomNaviBar）

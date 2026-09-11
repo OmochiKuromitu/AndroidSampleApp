@@ -14,19 +14,26 @@ import kotlinx.coroutines.flow.StateFlow
  * 「AppNavigation が必要とするもの」でまとめないのは、それが責務ではないから。
  * 基準が無い入れ物は、画面が増えるたびに無関係なものが同居して太る。
  *
+ * タイマー本体を ViewModel ではなく [IdleTimer]（@Singleton）に置いているのは、
+ * 画面消灯とバックグラウンド移行を Application が拾う必要があるため。
+ * ViewModel には Application から触れない。
+ *
  * 画面ではないので MVI（State / Intent / Effect）は敷かない。状態は [IdleTimer] に
  * あり、ここは素通しに徹する。
  */
 @HiltViewModel
-class SleepControlViewModel @Inject constructor(
+class IdleTimerViewModel @Inject constructor(
     private val idleTimer: IdleTimer,
 ) : ViewModel() {
 
     val isSleeping: StateFlow<Boolean> = idleTimer.isSleeping
 
+    /** ユーザー操作を検知したら呼ぶ。無操作タイマーを測り直す。 */
     fun onInteraction() = idleTimer.onInteraction()
 
+    /** スリープを解除する。解除操作や着信など、明示的に起こしたいときに呼ぶ。 */
     fun wake() = idleTimer.wake()
 
+    /** スリープタブが選ばれたときに呼ぶ。 */
     fun onSleepRequested() = idleTimer.onSleepRequested()
 }

@@ -37,17 +37,17 @@ import com.example.androidsampleapp.ui.top.TopScreen
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
-    sleepControl: SleepControlViewModel = hiltViewModel(),
+    idleTimer: IdleTimerViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-    val isSleeping by sleepControl.isSleeping.collectAsStateWithLifecycle()
+    val isSleeping by idleTimer.isSleeping.collectAsStateWithLifecycle()
 
     // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
     IncomingCallRouter(
         onIncomingCall = {
             navController.navigateToTab(MainTab.TOP)
-            sleepControl.wake()
+            idleTimer.wake()
         },
     )
 
@@ -64,7 +64,7 @@ fun AppNavigation(
 
     val onTabClick: (MainTab) -> Unit = { tab ->
         // スリープは画面ではなく状態。遷移は isSleeping を見た上の LaunchedEffect が行う。
-        if (tab == MainTab.SLEEP) sleepControl.onSleepRequested() else navController.navigateToTab(tab)
+        if (tab == MainTab.SLEEP) idleTimer.onSleepRequested() else navController.navigateToTab(tab)
     }
 
     Box(
@@ -76,7 +76,7 @@ fun AppNavigation(
                 awaitPointerEventScope {
                     while (true) {
                         awaitPointerEvent(PointerEventPass.Initial)
-                        sleepControl.onInteraction()
+                        idleTimer.onInteraction()
                     }
                 }
             },
@@ -104,10 +104,10 @@ fun AppNavigation(
 
             composable(Route.SLEEP) {
                 SleepScreen(
-                    onUnlock = { sleepControl.wake() },
+                    onUnlock = { idleTimer.wake() },
                     onNoticeSelected = { destination ->
                         navController.navigateToTab(destination.toMainTab())
-                        sleepControl.wake()
+                        idleTimer.wake()
                     },
                 )
             }
