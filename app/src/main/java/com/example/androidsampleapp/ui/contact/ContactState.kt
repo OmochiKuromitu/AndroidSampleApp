@@ -32,4 +32,6 @@ data class ContactState(
     val histories: List<CallHistory> = emptyList(),
     val isLoading: Boolean = false,
     val loadFailed: Boolean = false,
+    /** 履歴タブに出すバッジの件数。0 なら出さない。 */
+    val missedCallCount: Int = 0,
 ) : UiState

@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +43,7 @@ import com.example.androidsampleapp.ui.theme.dimensions
  *
  * 入口は [ContactRoute]。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactScreen(
     state: ContactState,
@@ -49,10 +53,17 @@ fun ContactScreen(
     Column(modifier = modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = state.selectedList.ordinal) {
             ContactList.entries.forEach { list ->
+                val badgeCount = if (list == ContactList.HISTORY) state.missedCallCount else 0
                 Tab(
                     selected = list == state.selectedList,
                     onClick = { onIntent(ContactIntent.ListSelected(list)) },
-                    text = { Text(stringResource(list.labelRes)) },
+                    text = {
+                        BadgedBox(
+                            badge = { if (badgeCount > 0) Badge { Text(badgeCount.toString()) } },
+                        ) {
+                            Text(stringResource(list.labelRes))
+                        }
+                    },
                 )
             }
         }
@@ -150,6 +161,7 @@ private fun ContactScreenPhonebookPreview() {
                 selectedList = ContactList.PHONEBOOK,
                 contacts = previewContacts,
                 histories = previewHistories,
+                missedCallCount = 2,
             ),
             onIntent = {},
         )
@@ -165,6 +177,7 @@ private fun ContactScreenHistoryPreview() {
                 selectedList = ContactList.HISTORY,
                 contacts = previewContacts,
                 histories = previewHistories,
+                missedCallCount = 2,
             ),
             onIntent = {},
         )

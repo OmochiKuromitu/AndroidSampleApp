@@ -204,7 +204,17 @@ data class NavigateToAircon(...) : SleepEffect
 | --- | --- | --- |
 | `XxxState` | 画面固有（送信中フラグ、入力中の値、表示の進み具合） | その画面の Reducer |
 | `core/AppStateHolder` | 機器から TCP で降ってくる状態（接続、着信、エアコン） | `data/DeviceRepositoryImpl` だけ |
-| 専用の `@Singleton` | 書き手も読み手も限られるもの（例: `IdleTimer` のスリープ状態） | そのクラス自身 |
+| 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数） | そのクラス自身 |
+
+**読み手が 1 画面なら共有の器を作らない。** その画面の `XxxState` に持たせる。
+読み手が 2 か所以上になった時点で `@Singleton` に引き上げる。
+`@Singleton` の保持先は Hilt の `SingletonComponent`（Application と同じ寿命）なので、
+`App` に手で持たせる必要はない。
+
+HTTP のように能動的に取りに行くものは、取得のきっかけを `AppNavigation` が決め、
+マネージャーは呼ばれたら取るだけにする。各画面がそれぞれ叩くと、画面が増えるたびに
+取得のタイミングが散る。実行中の要求が重ならないよう `refresh()` 側で間引くこと。
+見本は `core/MissedCallManager`。
 
 共有の器は書き手が複数いて初めて元が取れる。書き手が 1 つなら、そのクラスに持たせる。
 過去に「全画面が見るから」で `AppStateHolder` にスリープ状態を入れて、状態を持つ場所と

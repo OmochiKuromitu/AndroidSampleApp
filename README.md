@@ -155,6 +155,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 | --- | --- | --- |
 | `IdleTimerViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
 | `IncomingCallViewModel` | 着信の `StateFlow` | `IncomingCallRouter` |
+| `MissedCallViewModel` | `MissedCallManager` の取得の促し | `AppNavigation` |
 
 「`AppNavigation` が必要とするもの」という 1 つの入れ物にまとめない。それは責務ではなく、
 基準が無い入れ物は画面が増えるたびに無関係なものが同居して太る。
@@ -327,6 +328,31 @@ NoticeClicked ─▶ Reducer（状態は変えない）
 なお通知のタップは、下端スワイプを経ずに解除される唯一の経路になる。
 意図した操作なので許しているが、誤接触も通してしまう点は承知のうえ。
 
+### 不在着信のバッジ — MissedCallManager
+
+不在着信の件数は下部バーの連絡先タブと、連絡先画面の履歴タブの 2 か所が見る。
+読み手が複数いるので、`core/MissedCallManager` が保持する。
+
+```
+AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後）
+  └▶ MissedCallManager.refresh() ─▶ GET /missed-calls（未実装。今は仮データ）
+                                     └▶ missedCallCount: StateFlow
+                                         ├▶ MainViewModel   → 下部バーのバッジ
+                                         └▶ ContactViewModel → 履歴タブのバッジ
+```
+
+**取得のきっかけは画面の切り替え。** HTTP なので黙っていても届かないが、タイマーで
+叩き続けるほどの鮮度は要らない。切り替わる節目で取れば足りる。きっかけを決めるのは
+`AppNavigation`（遷移を知っているのがそこだけだから）で、マネージャーは呼ばれたら取るだけ。
+
+`refresh()` は実行中の要求があれば何もしない。タブを続けて叩かれたときに、同じ要求が
+重なって遅い順に上書きされるのを防ぐため。失敗しても前回の件数を残す。通信が一度
+こけただけでバッジが消えると、不在着信を見落とす方に倒れる。
+
+ViewModel ではなく `@Singleton` なのは、画面をまたいで同じ件数を見せるため。
+保持は Hilt の `SingletonComponent` が行う（Application と同じ寿命）。`App` に
+手で持たせる必要はない。`IdleTimer` と同じ形。
+
 ### 常時監視
 
 ```
@@ -353,7 +379,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── App.kt                  @HiltAndroidApp
 ├── MainActivity.kt
 ├── config/                 flavor に対応した設定（AppConfig）
-├── core/                   AppStateHolder — 全画面共有状態の単一管理者
+├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）
 │   └── mvi/                UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視

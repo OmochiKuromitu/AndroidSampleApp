@@ -56,6 +56,23 @@ class ContactReducerTest {
     }
 
     @Test
+    fun `不在着信の件数を取り込む`() {
+        val next = reducer.reduce(ContactState(), ContactIntent.MissedCallCountChanged(2))
+
+        assertEquals(2, next.missedCallCount)
+    }
+
+    @Test
+    fun `リストを切り替えてもバッジの件数は変わらない`() {
+        // 履歴を見ただけでは既読にしない。既読の API ができたらここが変わる。
+        val state = ContactState(missedCallCount = 2)
+
+        val next = reducer.reduce(state, ContactIntent.ListSelected(ContactList.HISTORY))
+
+        assertEquals(2, next.missedCallCount)
+    }
+
+    @Test
     fun `引数が履歴なら履歴から開く`() {
         assertEquals(
             ContactList.HISTORY,

@@ -41,6 +41,7 @@ import com.example.androidsampleapp.ui.top.TopRoute
 fun AppNavigation(
     modifier: Modifier = Modifier,
     idleTimer: IdleTimerViewModel = hiltViewModel(),
+    missedCall: MissedCallViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -54,8 +55,16 @@ fun AppNavigation(
         },
     )
 
+    // 不在着信は HTTP なので黙っていても届かない。画面が切り替わる節目で取りに行く。
+    // 起動直後に 1 度取らないと、最初のタブ移動まで下部バーのバッジが出ない。
+    LaunchedEffect(Unit) {
+        missedCall.refresh()
+    }
+
     LaunchedEffect(isSleeping) {
         if (isSleeping) {
+            // スリープ画面が前に出たタイミング。
+            missedCall.refresh()
             if (navController.currentDestination?.route != Route.SLEEP) {
                 navController.navigate(Route.SLEEP) { launchSingleTop = true }
             }
@@ -66,6 +75,7 @@ fun AppNavigation(
     }
 
     val onTabClick: (MainTab) -> Unit = { tab ->
+        missedCall.refresh()
         // スリープは画面ではなく状態。遷移は isSleeping を見た上の LaunchedEffect が行う。
         if (tab == MainTab.SLEEP) idleTimer.onSleepRequested() else navController.navigateToTab(tab)
     }

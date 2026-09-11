@@ -62,4 +62,6 @@ fun NoticeDestination.toRoute(): String = when (this) {
  */
 data class MainState(
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
+    /** 連絡先タブに出すバッジの件数。0 なら出さない。 */
+    val missedCallCount: Int = 0,
 ) : UiState

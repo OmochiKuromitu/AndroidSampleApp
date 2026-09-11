@@ -35,7 +35,11 @@ fun MainScreen(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            BottomNaviBar(selectedTab = selectedTab, onTabClick = onTabClick)
+            BottomNaviBar(
+                selectedTab = selectedTab,
+                onTabClick = onTabClick,
+                missedCallCount = state.missedCallCount,
+            )
         },
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
@@ -53,7 +57,7 @@ fun MainScreen(
 private fun MainScreenConnectedPreview() {
     PreviewSurface {
         MainScreen(
-            state = MainState(connectionState = ConnectionState.CONNECTED),
+            state = MainState(connectionState = ConnectionState.CONNECTED, missedCallCount = 2),
             selectedTab = MainTab.TOP,
             onTabClick = {},
             snackbarHostState = remember { SnackbarHostState() },

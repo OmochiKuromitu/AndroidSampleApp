@@ -15,6 +15,8 @@ class ContactReducer : Reducer<ContactState, ContactIntent> {
 
         ContactIntent.LoadFailed -> state.copy(isLoading = false, loadFailed = true)
 
+        is ContactIntent.MissedCallCountChanged -> state.copy(missedCallCount = intent.count)
+
         // 取得済みの一覧を出し分けるだけなので、通信は起きない。
         is ContactIntent.ListSelected -> state.copy(selectedList = intent.list)
     }

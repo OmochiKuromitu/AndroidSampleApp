@@ -28,6 +28,12 @@ class ContactRepositoryImpl @Inject constructor() : ContactRepository {
         return FAKE_HISTORIES.map { it.toDomain() }
     }
 
+    override suspend fun getMissedCallCount(): Int {
+        // TODO: GET {AppConfig.apiBaseUrl}/missed-calls に置き換える。
+        delay(API_DELAY_MS)
+        return FAKE_HISTORIES.count { it.missed }
+    }
+
     private fun ContactResponse.toDomain(): Contact = Contact(
         id = id,
         name = name,

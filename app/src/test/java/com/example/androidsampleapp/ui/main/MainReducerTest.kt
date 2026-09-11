@@ -19,6 +19,13 @@ class MainReducerTest {
     }
 
     @Test
+    fun `不在着信の件数を取り込む`() {
+        val next = reducer.reduce(MainState(), MainIntent.MissedCallCountChanged(3))
+
+        assertEquals(3, next.missedCallCount)
+    }
+
+    @Test
     fun `切断も取り込む`() {
         val state = MainState(connectionState = ConnectionState.CONNECTED)
 

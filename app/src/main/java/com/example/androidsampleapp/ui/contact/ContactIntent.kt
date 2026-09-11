@@ -17,4 +17,7 @@ sealed interface ContactIntent : UiIntent {
     ) : ContactIntent
 
     data object LoadFailed : ContactIntent
+
+    /** 不在着信の件数の変化。取得は MissedCallManager が行う。 */
+    data class MissedCallCountChanged(val count: Int) : ContactIntent
 }

@@ -1,16 +1,20 @@
 package com.example.androidsampleapp.ui.contact
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import com.example.androidsampleapp.core.MissedCallManager
 import com.example.androidsampleapp.core.mvi.MviViewModel
 import com.example.androidsampleapp.domain.usecase.GetCallHistoriesUseCase
 import com.example.androidsampleapp.domain.usecase.GetContactsUseCase
 import com.example.androidsampleapp.ui.common.Route
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    missedCallManager: MissedCallManager,
     private val getContacts: GetContactsUseCase,
     private val getCallHistories: GetCallHistoriesUseCase,
 ) : MviViewModel<ContactState, ContactIntent, ContactEffect>(
@@ -24,6 +28,12 @@ class ContactViewModel @Inject constructor(
 ) {
 
     init {
+        // 取得は MissedCallManager が行う。ここは件数を見るだけ。
+        viewModelScope.launch {
+            missedCallManager.missedCallCount.collect {
+                dispatch(ContactIntent.MissedCallCountChanged(it))
+            }
+        }
         dispatch(ContactIntent.Started)
     }
 
@@ -36,6 +46,7 @@ class ContactViewModel @Inject constructor(
             is ContactIntent.ListSelected,
             is ContactIntent.Loaded,
             ContactIntent.LoadFailed,
+            is ContactIntent.MissedCallCountChanged,
             -> Unit
         }
     }

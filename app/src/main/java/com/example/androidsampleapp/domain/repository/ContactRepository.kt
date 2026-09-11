@@ -13,4 +13,7 @@ interface ContactRepository {
 
     /** 通話履歴取得 API。新しいものが先頭。 */
     suspend fun getCallHistories(): List<CallHistory>
+
+    /** 不在着信取得 API。未確認の件数を返す。 */
+    suspend fun getMissedCallCount(): Int
 }
