@@ -137,6 +137,8 @@ Effect の名前が `NavigateToXxx` ではなく `Unlocked` / `NoticeSelected` �
 ViewModel は出来事を報告するだけで、命令はしない。
 
 NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。呼ぶのは各画面の `XxxRoute`。
+行き先は `Route` の定数だけで指定し、どのタブを選択状態にするかは
+`MainTab.fromRoute()` がそこから引く。ルートとタブを別々に書くとずれるため。
 `ui/main/MainRoute` はヘッダーと下部バーの枠で、中身はスロットで受け取る。
 スリープ画面だけこの枠を被せずに出す。
 
@@ -369,7 +371,8 @@ Claude Code はこのリポジトリで作業するとき自動で参照する�
 - **画面を 1 つ足す** — `ui/<name>/` に 7 ファイル。ViewModel は `@HiltViewModel`。
   遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。
 - **タブを 1 つ足す** — `Route` に 1 行、`MainTab` に 1 行、`AppNavigation` の NavHost に
-  `composable` を 1 つ。
+  `tabDestination(Route.XXX, ...)` を 1 つ。選択状態にするタブはルート文字列から引くので、
+  行き先を二重に書かない。
 - **機器の機能を 1 つ足す** — `model/CommandRequest` にコマンド、`MessageParser` に解釈、
   `domain/repository` に口、`data` に実装、`domain/usecase` に UseCase。
 

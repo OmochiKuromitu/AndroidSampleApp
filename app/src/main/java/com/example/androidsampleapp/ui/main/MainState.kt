@@ -24,6 +24,20 @@ enum class MainTab(
     TOP(Route.TOP, R.string.tab_top, Icons.Filled.Home),
     AIRCON(Route.AIRCON, R.string.tab_aircon, Icons.Filled.AcUnit),
     SLEEP(Route.SLEEP, R.string.tab_sleep, Icons.Filled.Bedtime),
+    ;
+
+    companion object {
+        /**
+         * ルート文字列に対応するタブを引く。
+         *
+         * 行き先を「ルート」と「タブ」で二重に書かないためのもの。二重に書くと、
+         * 片方だけ直したときにヘッダーの見出しと下部バーのハイライトがずれる。
+         * 対応が無いのは [Route] への追加漏れなので、その場で落として気づけるようにする。
+         */
+        fun fromRoute(route: String): MainTab =
+            entries.firstOrNull { it.route == route }
+                ?: error("$route に対応する MainTab がない")
+    }
 }
 
 /**
