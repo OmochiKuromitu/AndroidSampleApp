@@ -151,13 +151,11 @@ Route と Screen を分けるのは、Screen を表示だけに保つため。�
 
 1. `ui/common/Route.kt` にルート文字列を 1 行。
 2. タブなら `ui/main/MainState.kt` の `MainTab` に 1 行（ルートは `Route.XXX` を渡す）。
-3. `AppNavigation` の `NavHost` に 1 つ足す。
-   - 下部バーを出す画面: `tabDestination(Route.XXX, onTabClick, snackbarHostState) { XxxRoute(...) }`
-   - 枠を被せない全画面: `composable(Route.XXX) { XxxRoute(...) }`
+3. `AppNavigation` の `NavHost` に `composable(Route.XXX) { ... }` を 1 つ。
 
-`tabDestination` は行き先を `Route.XXX` だけで受け取り、選択状態にするタブは
-`MainTab.fromRoute()` で引く。ルートとタブを両方書くと、片方だけ直したときに
-ヘッダーの見出しと下部バーのハイライトがずれる。遷移に使う値は `Route` から取ること。
+下部バーを出す画面は `MainRoute` で包む。選択状態にするタブは `MainTab.fromRoute(Route.XXX)`
+で引くこと。`MainTab.XXX` と直接書かないのは、遷移に使う値の出どころを `Route` に
+揃えておくため。
 
 画面から遷移したいときは、ViewModel が **「何が起きたか」** を Effect で返し、
 `AppNavigation` が行き先を決める。

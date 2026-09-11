@@ -371,8 +371,7 @@ Claude Code はこのリポジトリで作業するとき自動で参照する�
 - **画面を 1 つ足す** — `ui/<name>/` に 7 ファイル。ViewModel は `@HiltViewModel`。
   遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。
 - **タブを 1 つ足す** — `Route` に 1 行、`MainTab` に 1 行、`AppNavigation` の NavHost に
-  `tabDestination(Route.XXX, ...)` を 1 つ。選択状態にするタブはルート文字列から引くので、
-  行き先を二重に書かない。
+  `composable` を 1 つ。選択するタブは `MainTab.fromRoute(Route.XXX)` で引く。
 - **機器の機能を 1 つ足す** — `model/CommandRequest` にコマンド、`MessageParser` に解釈、
   `domain/repository` に口、`data` に実装、`domain/usecase` に UseCase。
 

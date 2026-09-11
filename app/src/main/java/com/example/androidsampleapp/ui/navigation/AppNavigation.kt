@@ -13,7 +13,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -83,12 +82,25 @@ fun AppNavigation(
             },
     ) {
         NavHost(navController = navController, startDestination = Route.TOP) {
-            tabDestination(Route.TOP, onTabClick, snackbarHostState) {
-                TopRoute(snackbarHostState = snackbarHostState)
+            composable(Route.TOP) {
+                MainRoute(
+                    // 行き先はルートで指定し、選択するタブはそこから引く。
+                    selectedTab = MainTab.fromRoute(Route.TOP),
+                    onTabClick = onTabClick,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    TopRoute(snackbarHostState = snackbarHostState)
+                }
             }
 
-            tabDestination(Route.AIRCON, onTabClick, snackbarHostState) {
-                AirconRoute(snackbarHostState = snackbarHostState)
+            composable(Route.AIRCON) {
+                MainRoute(
+                    selectedTab = MainTab.fromRoute(Route.AIRCON),
+                    onTabClick = onTabClick,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    AirconRoute(snackbarHostState = snackbarHostState)
+                }
             }
 
             composable(Route.SLEEP) {
@@ -101,28 +113,6 @@ fun AppNavigation(
                 )
             }
         }
-    }
-}
-
-/**
- * 下部バーを持つ画面を 1 つ登録する。
- *
- * 行き先は [route] だけで指定し、どのタブを選択状態にするかはそこから引く。
- * 両方を書くと、片方だけ直したときにヘッダーの見出しとバーのハイライトがずれる。
- */
-private fun NavGraphBuilder.tabDestination(
-    route: String,
-    onTabClick: (MainTab) -> Unit,
-    snackbarHostState: SnackbarHostState,
-    content: @Composable () -> Unit,
-) {
-    composable(route) {
-        MainRoute(
-            selectedTab = MainTab.fromRoute(route),
-            onTabClick = onTabClick,
-            snackbarHostState = snackbarHostState,
-            content = content,
-        )
     }
 }
 
