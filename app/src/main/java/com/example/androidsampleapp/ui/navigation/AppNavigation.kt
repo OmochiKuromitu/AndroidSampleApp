@@ -5,26 +5,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.androidsampleapp.core.AppStateHolder
+import com.example.androidsampleapp.ui.aircon.AirconScreen
 import com.example.androidsampleapp.ui.common.Route
 import com.example.androidsampleapp.ui.main.MainScreen
 import com.example.androidsampleapp.ui.main.MainTab
 import com.example.androidsampleapp.ui.main.toMainTab
 import com.example.androidsampleapp.ui.sleep.SleepScreen
+import com.example.androidsampleapp.ui.top.TopScreen
 
 /**
- * アプリ全体の遷移。持つルートは 2 つだけで、タブの中身は [MainScreen] の内側の
- * NavHost が持つ。下部バーの有無で階層を分けている。
+ * アプリの遷移をすべてここで行う。
+ *
+ * 各画面の ViewModel は「何が起きたか」を返すだけで、どこへ行くかは決めない。
+ * NavController もここだけが持つ。遷移の判断と実行が 1 か所に揃っていないと、
+ * 「この画面はどこから来てどこへ行くのか」を追うのにファイルを行き来する羽目になる。
+ *
+ * NavHost は 1 つ。スリープ画面だけ枠（ヘッダーと下部バー）を被せずに出す。
  */
 @Composable
 fun AppNavigation(
@@ -33,20 +41,29 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
     val isSleeping by idleTimer.isSleeping.collectAsStateWithLifecycle()
 
-    // スリープ画面で通知をタップしたときの行き先。復帰後にメイン画面が受け取って消す。
-    // タブは MainViewModel の状態なので、ここからは「どのタブを出したいか」だけを渡す。
-    var requestedTab by remember { mutableStateOf<MainTab?>(null) }
-
-    IncomingCallRouter(appStateHolder = appStateHolder, idleTimer = idleTimer)
+    // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
+    IncomingCallRouter(appStateHolder = appStateHolder) {
+        navController.navigateToTab(MainTab.TOP)
+        idleTimer.wake()
+    }
 
     LaunchedEffect(isSleeping) {
         if (isSleeping) {
-            navController.navigate(Route.SLEEP) { launchSingleTop = true }
+            if (navController.currentDestination?.route != Route.SLEEP) {
+                navController.navigate(Route.SLEEP) { launchSingleTop = true }
+            }
         } else {
-            navController.popBackStack(Route.MAIN, inclusive = false)
+            // 直前に見ていたタブへ戻る。スタックに無ければ何も起きない。
+            navController.popBackStack(Route.SLEEP, inclusive = true)
         }
+    }
+
+    val onTabClick: (MainTab) -> Unit = { tab ->
+        // スリープは画面ではなく状態。遷移は isSleeping を見た上の LaunchedEffect が行う。
+        if (tab == MainTab.SLEEP) idleTimer.onSleepRequested() else navController.navigateToTab(tab)
     }
 
     Box(
@@ -63,23 +80,45 @@ fun AppNavigation(
                 }
             },
     ) {
-        NavHost(navController = navController, startDestination = Route.MAIN) {
-            composable(Route.MAIN) {
+        NavHost(navController = navController, startDestination = Route.TOP) {
+            composable(Route.TOP) {
                 MainScreen(
-                    onNavigateToSleep = { idleTimer.onSleepRequested() },
-                    requestedTab = requestedTab,
-                    onRequestedTabConsumed = { requestedTab = null },
-                )
+                    selectedTab = MainTab.TOP,
+                    onTabClick = onTabClick,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    TopScreen(snackbarHostState = snackbarHostState)
+                }
             }
+
+            composable(Route.AIRCON) {
+                MainScreen(
+                    selectedTab = MainTab.AIRCON,
+                    onTabClick = onTabClick,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    AirconScreen(snackbarHostState = snackbarHostState)
+                }
+            }
+
             composable(Route.SLEEP) {
                 SleepScreen(
-                    onWake = { idleTimer.wake() },
-                    onOpenDestination = { destination ->
-                        requestedTab = destination.toMainTab()
+                    onUnlock = { idleTimer.wake() },
+                    onNoticeSelected = { destination ->
+                        navController.navigateToTab(destination.toMainTab())
                         idleTimer.wake()
                     },
                 )
             }
         }
+    }
+}
+
+/** タブ切り替えの定型。タブごとのバックスタックを保存・復元する。 */
+private fun NavHostController.navigateToTab(tab: MainTab) {
+    navigate(tab.route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

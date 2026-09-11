@@ -3,11 +3,9 @@ package com.example.androidsampleapp.ui.main
 import com.example.androidsampleapp.core.mvi.UiEffect
 
 /**
- * 遷移は一回きりの命令なので Effect にする。
- * State に持たせると、画面回転などの再生成のたびに再遷移してしまう。
+ * この画面が出す一回きりの出来事は、今のところ無い。
+ *
+ * 以前はここにタブ遷移の命令が並んでいたが、遷移は AppNavigation の担当になった。
+ * 枠（ヘッダーと下部バー）に一回きりの出来事が生まれたら、ここに足す。
  */
-sealed interface MainEffect : UiEffect {
-    data class NavigateToTab(val tab: MainTab) : MainEffect
-    data class PopToTabRoot(val tab: MainTab) : MainEffect
-    data object NavigateToSleep : MainEffect
-}
+sealed interface MainEffect : UiEffect

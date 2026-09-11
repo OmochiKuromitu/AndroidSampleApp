@@ -14,7 +14,7 @@ import com.example.androidsampleapp.ui.common.Route
 
 /**
  * 下部バーのタブ。ここに 1 件足せばタブが 1 つ増える。
- * SLEEP だけは表示先が別のトップレベルルートなので、扱いが他と異なる。
+ * SLEEP は画面を出すのではなくスリープ状態に入れるだけなので、扱いが他と異なる。
  */
 enum class MainTab(
     val route: String,
@@ -34,8 +34,12 @@ fun NoticeDestination.toMainTab(): MainTab = when (this) {
     NoticeDestination.AIRCON -> MainTab.AIRCON
 }
 
+/**
+ * メイン画面の枠が持つ状態。
+ *
+ * 選択中のタブはここに無い。どのタブを表示しているかは NavController の現在地であって
+ * 画面の状態ではないため、AppNavigation が決めて引数で渡す。
+ */
 data class MainState(
-    /** 表示中のコンテンツタブ。SLEEP はここに入らない。 */
-    val selectedTab: MainTab = MainTab.TOP,
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
 ) : UiState

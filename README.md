@@ -73,7 +73,7 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | --- | --- |
 | `XxxState.kt` | 画面の状態。`UiState` を実装した data class |
 | `XxxIntent.kt` | 入力の一覧。`UiIntent` を実装した sealed interface |
-| `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface |
+| `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface。遷移の命令は書かない |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
 | `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
 | `XxxScreen.kt` | Composable。State を描き、Intent を投げ、Effect を受ける |
@@ -114,19 +114,30 @@ private fun AirconContentOfflinePreview() {
 
 ### 画面遷移の扱い
 
-| 対象 | 表現 | 理由 |
+**遷移は `ui/navigation/AppNavigation` だけが行う。** `NavController` を持つのもここだけ。
+
+各画面の ViewModel は「何が起きたか」を Effect で返すだけで、どこへ行くかは決めない。
+画面の Composable も `navController` を触らない。判断と実行が散っていると、
+「この画面はどこから来てどこへ行くのか」を追うのにファイルを行き来することになる。
+
+| 出来事 | 誰が伝えるか | AppNavigation がすること |
 | --- | --- | --- |
-| 選択中のタブ | `MainState.selectedTab`（State） | 再生成後も復元されるべき値。下部バーのハイライトはここだけを見る |
-| タブへの遷移 | `MainEffect.NavigateToTab`（Effect） | 一回きりの命令 |
-| 同じタブの再タップ | `MainEffect.PopToTabRoot`（Effect） | 状態は変わらないが動作はある |
-| スリープへ | `MainEffect.NavigateToSleep`（Effect） | タブではないので `selectedTab` を動かさない。復帰時に元のタブへ戻る |
-| 戻る操作での移動 | `MainIntent.BackStackChanged`（Intent） | NavController が先に動いた結果を State に追従させるだけ。ここから再遷移するとループする |
+| タブがタップされた | `MainScreen` の `onTabClick` | そのタブへ navigate |
+| スリープタブがタップされた | 同上 | `IdleTimer.onSleepRequested()`。遷移は下の行で起きる |
+| スリープ状態になった / 解けた | `IdleTimer.isSleeping` | スリープ画面へ navigate / 元のタブへ戻る |
+| 解除の操作が成立した | `SleepEffect.Unlocked` | `IdleTimer.wake()` |
+| 通知が選ばれた | `SleepEffect.NoticeSelected(destination)` | その飛び先へ navigate して `wake()` |
+| 着信した | `IncomingCallRouter` | トップへ navigate して `wake()` |
 
-タップは必ず `MainIntent.TabClicked` として Reducer を通り、その結果の Effect が navigate を呼ぶ。
-Composable から直接 `navController.navigate` は呼ばない。
+Effect の名前が `NavigateToXxx` ではなく `Unlocked` / `NoticeSelected` なのは意図的。
+ViewModel は出来事を報告するだけで、命令はしない。
 
-NavHost は 2 段になっている。外側（`ui/navigation/AppNavigation`）が `main` と `sleep`、
-内側（`ui/main/MainScreen`）がタブの中身。下部バーの有無で階層を分けている。
+NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。`ui/main/MainScreen` は
+ヘッダーと下部バーの枠だけを描く Composable で、中身はスロットで受け取る。
+スリープ画面だけこの枠を被せずに出す。
+
+選択中のタブは State に持たない。どのタブを表示しているかは NavController の現在地であって
+画面の状態ではないので、`AppNavigation` が決めて `MainScreen` に引数で渡す。
 
 ### 共有状態 — AppStateHolder
 
@@ -252,14 +263,9 @@ data class Notice(
 
 ```
 NoticeClicked ─▶ Reducer（状態は変えない）
-              └▶ handle() ─▶ SleepEffect.OpenDestination
-                              └▶ AppNavigation が requestedTab に控えて idleTimer.wake()
-                                  └▶ 復帰してメイン画面が composed され、
-                                      MainIntent.TabClicked として消化される
+              └▶ handle() ─▶ SleepEffect.NoticeSelected(destination)
+                              └▶ AppNavigation がその飛び先へ navigate して wake()
 ```
-
-タブは `MainViewModel` の状態で、`AppNavigation` からは直接触れない。そのため
-「どのタブを出したいか」だけを引数で渡し、受け取った側が 1 度だけ処理して消す。
 
 なお通知のタップは、下端スワイプを経ずに解除される唯一の経路になる。
 意図した操作なので許しているが、誤接触も通してしまう点は承知のうえ。
@@ -305,7 +311,7 @@ app/src/main/java/com/example/androidsampleapp/
     ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
     ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
-    ├── main/               BottomNaviBar とメイン画面（MVI 6 ファイル + BottomNaviBar）
+    ├── main/               ヘッダーと BottomNaviBar の枠（MVI 6 ファイル + BottomNaviBar）
     ├── top/                メイン画面に入れる画面（MVI 6 ファイル）
     ├── aircon/             エアコン操作（MVI 6 ファイル）
     └── sleep/              スリープ画面（MVI 6 ファイル）
@@ -322,7 +328,9 @@ app/src/main/java/com/example/androidsampleapp/
 ### 足すとき
 
 - **画面を 1 つ足す** — `ui/<name>/` に 6 ファイル。ViewModel は `@HiltViewModel`。
-- **タブを 1 つ足す** — `MainTab` に 1 行と `MainScreen` の NavHost に `composable` を 1 つ。
+  遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。
+- **タブを 1 つ足す** — `Route` に 1 行、`MainTab` に 1 行、`AppNavigation` の NavHost に
+  `composable` を 1 つ。
 - **機器の機能を 1 つ足す** — `model/CommandRequest` にコマンド、`MessageParser` に解釈、
   `domain/repository` に口、`data` に実装、`domain/usecase` に UseCase。
 

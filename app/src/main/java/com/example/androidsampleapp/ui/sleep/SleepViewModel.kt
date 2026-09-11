@@ -57,11 +57,11 @@ class SleepViewModel @Inject constructor(
             // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
             is SleepIntent.UnlockDragged ->
                 if (!previous.isUnlockReached && current.isUnlockReached) {
-                    sendEffect(SleepEffect.Wake)
+                    sendEffect(SleepEffect.Unlocked)
                 }
 
             is SleepIntent.NoticeClicked ->
-                sendEffect(SleepEffect.OpenDestination(intent.notice.destination))
+                sendEffect(SleepEffect.NoticeSelected(intent.notice.destination))
 
             SleepIntent.UnlockCancelled,
             SleepIntent.NoticesLoaded,

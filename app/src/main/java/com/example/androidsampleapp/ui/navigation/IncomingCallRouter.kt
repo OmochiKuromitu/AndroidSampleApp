@@ -7,20 +7,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.core.AppStateHolder
 
 /**
- * 着信したときの画面の振り分け。
+ * 着信を検知して知らせるだけ。何をするかは呼び出し側（[AppNavigation]）が決める。
  *
- * ここでは「スリープからの復帰」だけを担う。着信でトップタブへ切り替える判断は
- * MainViewModel が MainIntent.IncomingCallReceived として持っている。
- * スリープはアプリ全体の状態、タブは Main 画面の状態なので、置き場所を分けている。
+ * 検知と遷移を分けておくと、着信時の挙動を変えるときにこのファイルを触らずに済む。
  */
 @Composable
 fun IncomingCallRouter(
     appStateHolder: AppStateHolder,
-    idleTimer: IdleTimer,
+    onIncomingCall: () -> Unit,
 ) {
     val incomingCall by appStateHolder.incomingCall.collectAsStateWithLifecycle()
 
     LaunchedEffect(incomingCall) {
-        if (incomingCall != null) idleTimer.wake()
+        if (incomingCall != null) onIncomingCall()
     }
 }

@@ -49,8 +49,8 @@ import com.example.androidsampleapp.ui.theme.dimensions
  */
 @Composable
 fun SleepScreen(
-    onWake: () -> Unit,
-    onOpenDestination: (NoticeDestination) -> Unit,
+    onUnlock: () -> Unit,
+    onNoticeSelected: (NoticeDestination) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SleepViewModel = hiltViewModel(),
 ) {
@@ -58,8 +58,8 @@ fun SleepScreen(
 
     CollectEffect(viewModel.effect) { effect ->
         when (effect) {
-            SleepEffect.Wake -> onWake()
-            is SleepEffect.OpenDestination -> onOpenDestination(effect.destination)
+            SleepEffect.Unlocked -> onUnlock()
+            is SleepEffect.NoticeSelected -> onNoticeSelected(effect.destination)
         }
     }
 

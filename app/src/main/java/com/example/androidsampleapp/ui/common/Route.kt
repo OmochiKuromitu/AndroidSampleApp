@@ -2,15 +2,12 @@ package com.example.androidsampleapp.ui.common
 
 /**
  * 画面の住所。文字列リテラルを散らかさないよう、ここ 1 か所で定義する。
+ * これらを使って実際に遷移するのは AppNavigation だけ。
  */
 object Route {
-    /** 下部バーを持つメイン画面。 */
-    const val MAIN = "main"
+    const val TOP = "top"
+    const val AIRCON = "aircon"
 
-    /** スリープ画面。全画面表示のため、メインとは別のトップレベルルートにする。 */
+    /** スリープ画面。下部バーを出さないので、タブの枠には入れない。 */
     const val SLEEP = "sleep"
-
-    /** メイン画面の中のタブ。 */
-    const val TOP = "main/top"
-    const val AIRCON = "main/aircon"
 }
