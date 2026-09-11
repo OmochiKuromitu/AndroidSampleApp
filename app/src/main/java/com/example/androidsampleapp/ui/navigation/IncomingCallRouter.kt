@@ -4,7 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.androidsampleapp.core.AppStateHolder
+import com.example.androidsampleapp.domain.model.IncomingCall
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 着信を検知して知らせるだけ。何をするかは呼び出し側（[AppNavigation]）が決める。
@@ -13,12 +14,12 @@ import com.example.androidsampleapp.core.AppStateHolder
  */
 @Composable
 fun IncomingCallRouter(
-    appStateHolder: AppStateHolder,
+    incomingCall: StateFlow<IncomingCall?>,
     onIncomingCall: () -> Unit,
 ) {
-    val incomingCall by appStateHolder.incomingCall.collectAsStateWithLifecycle()
+    val current by incomingCall.collectAsStateWithLifecycle()
 
-    LaunchedEffect(incomingCall) {
-        if (incomingCall != null) onIncomingCall()
+    LaunchedEffect(current) {
+        if (current != null) onIncomingCall()
     }
 }

@@ -10,13 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.SnackbarHostState
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.androidsampleapp.core.AppStateHolder
 import com.example.androidsampleapp.ui.aircon.AirconScreen
 import com.example.androidsampleapp.ui.common.Route
 import com.example.androidsampleapp.ui.main.MainScreen
@@ -36,18 +36,17 @@ import com.example.androidsampleapp.ui.top.TopScreen
  */
 @Composable
 fun AppNavigation(
-    appStateHolder: AppStateHolder,
-    idleTimer: IdleTimer,
     modifier: Modifier = Modifier,
+    viewModel: AppNavigationViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-    val isSleeping by idleTimer.isSleeping.collectAsStateWithLifecycle()
+    val isSleeping by viewModel.isSleeping.collectAsStateWithLifecycle()
 
     // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
-    IncomingCallRouter(appStateHolder = appStateHolder) {
+    IncomingCallRouter(incomingCall = viewModel.incomingCall) {
         navController.navigateToTab(MainTab.TOP)
-        idleTimer.wake()
+        viewModel.wake()
     }
 
     LaunchedEffect(isSleeping) {
@@ -63,7 +62,7 @@ fun AppNavigation(
 
     val onTabClick: (MainTab) -> Unit = { tab ->
         // スリープは画面ではなく状態。遷移は isSleeping を見た上の LaunchedEffect が行う。
-        if (tab == MainTab.SLEEP) idleTimer.onSleepRequested() else navController.navigateToTab(tab)
+        if (tab == MainTab.SLEEP) viewModel.onSleepRequested() else navController.navigateToTab(tab)
     }
 
     Box(
@@ -75,7 +74,7 @@ fun AppNavigation(
                 awaitPointerEventScope {
                     while (true) {
                         awaitPointerEvent(PointerEventPass.Initial)
-                        idleTimer.onInteraction()
+                        viewModel.onInteraction()
                     }
                 }
             },
@@ -103,10 +102,10 @@ fun AppNavigation(
 
             composable(Route.SLEEP) {
                 SleepScreen(
-                    onUnlock = { idleTimer.wake() },
+                    onUnlock = { viewModel.wake() },
                     onNoticeSelected = { destination ->
                         navController.navigateToTab(destination.toMainTab())
-                        idleTimer.wake()
+                        viewModel.wake()
                     },
                 )
             }

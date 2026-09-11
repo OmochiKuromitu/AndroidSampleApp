@@ -139,6 +139,16 @@ NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。`ui/main/MainScree
 選択中のタブは State に持たない。どのタブを表示しているかは NavController の現在地であって
 画面の状態ではないので、`AppNavigation` が決めて `MainScreen` に引数で渡す。
 
+必要なもの（`IdleTimer` と着信の `StateFlow`）は `AppNavigationViewModel` 経由で取る。
+Composable には `@Inject` できないので、誰かが渡す必要がある。Activity に持たせて
+引数で降ろす手もあるが、遷移に必要なものが増えるたびに `MainActivity` が太るため、
+ViewModel にして `AppNavigation` 側で閉じている。画面ではないので MVI は敷かず、
+状態を持たない素通しの窓口にしてある。
+
+なお `App`（Application）は `IdleTimer` を直接注入している。こちらは
+`hiltViewModel()` が使えないため。`IdleTimer` が ViewModel ではなく `@Singleton`
+である理由もここにある。
+
 ### 共有状態 — AppStateHolder
 
 接続状態・着信・エアコンの現在値は、全画面が見る。これを `core/AppStateHolder` が単独で持つ。
@@ -308,7 +318,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── network/                TcpClient / MessageParser / UdpCommandClient
 ├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
 └── ui/
-    ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
+    ├── navigation/         AppNavigation / AppNavigationViewModel / IncomingCallRouter / IdleTimer
     ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
     ├── main/               ヘッダーと BottomNaviBar の枠（MVI 6 ファイル + BottomNaviBar）
