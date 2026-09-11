@@ -197,6 +197,20 @@ data class NavigateToAircon(...) : SleepEffect
 どちらの場合も `domain/repository/` に interface、`domain/usecase/` に UseCase、
 `di/RepositoryModule` に `@Binds` を 1 行。ui 層は実装クラスを知らないままにする。
 
+### UseCase の粒度
+
+**呼び出し側から見た 1 つの操作に対して 1 つ。** リポジトリのメソッドを 1 対 1 で
+包み直すために作らない。
+
+- よい: `ClearNoticesUseCase` は消去 API を呼んでから取得 API を呼び、新しい一覧を返す。
+  呼び出し側は「消した結果の一覧が返る」とだけ知っていればよく、API が 2 本であることを知らない。
+- 避ける: `RefreshNoticesUseCase`（取りに行く）と `ObserveNoticesUseCase`（結果を見る）に
+  分ける。同じ 1 つの関心事が 2 つに割れて、ViewModel が両方を注入する羽目になる。
+
+ViewModel が 3 つ以上 UseCase を注いでいたら、割りすぎを疑う。
+なお `ObserveXxxUseCase` のように `StateFlow` を素通しするだけのものは、
+機器の共有状態（接続、着信、エアコン）のように複数画面が同じものを見る場合に限る。
+
 flavor で変わる値（接続先、タイムアウト、API のベース URL）は
 `app/build.gradle.kts` の `buildConfigField` と `config/AppConfig` に置く。
 アプリ側は `BuildConfig` を直接触らない。

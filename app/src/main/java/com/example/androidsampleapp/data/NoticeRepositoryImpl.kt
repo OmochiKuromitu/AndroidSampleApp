@@ -8,39 +8,30 @@ import com.example.androidsampleapp.model.NoticeResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 通知は HTTP の API から取る。機器との TCP とは経路が別なので、
  * AppStateHolder（機器から降ってくる状態）は通らない。
  *
- * サーバ側が未実装のため、今は [fetchFromApi] が仮データを返す。
- * 差し替えるのはこのクラスの中だけで、UseCase から上は変わらない。
+ * サーバ側が未実装のため、今は [fakeServerNotices] が「サーバが持っているはずのデータ」を
+ * 肩代わりしている。API ができたらこのフィールドごと消す。
  */
 @Singleton
 class NoticeRepositoryImpl @Inject constructor() : NoticeRepository {
 
-    private val _notices = MutableStateFlow<List<Notice>>(emptyList())
-    override val notices: StateFlow<List<Notice>> = _notices.asStateFlow()
+    /** TODO: API ができたら削除する。本来はサーバが持つデータ。 */
+    private var fakeServerNotices: List<NoticeResponse> = FAKE_RESPONSE
 
-    override suspend fun refresh() {
-        _notices.value = fetchFromApi().map { it.toDomain() }
+    override suspend fun getNotices(): List<Notice> {
+        // TODO: GET {AppConfig.apiBaseUrl}/notices に置き換える。
+        delay(API_DELAY_MS)
+        return fakeServerNotices.map { it.toDomain() }
     }
 
-    override suspend fun clear() {
-        // TODO: API ができたら DELETE {AppConfig.apiBaseUrl}/notices に置き換える。
-        _notices.value = emptyList()
-    }
-
-    /**
-     * TODO: API ができたら GET {AppConfig.apiBaseUrl}/notices に置き換える。
-     * 通信の遅れを画面で確認できるよう、仮データでも少し待たせている。
-     */
-    private suspend fun fetchFromApi(): List<NoticeResponse> {
-        delay(FETCH_DELAY_MS)
-        return FAKE_RESPONSE
+    override suspend fun deleteAllNotices() {
+        // TODO: DELETE {AppConfig.apiBaseUrl}/notices に置き換える。
+        delay(API_DELAY_MS)
+        fakeServerNotices = emptyList()
     }
 
     private fun NoticeResponse.toDomain(): Notice = Notice(
@@ -51,9 +42,9 @@ class NoticeRepositoryImpl @Inject constructor() : NoticeRepository {
     )
 
     private companion object {
-        const val FETCH_DELAY_MS = 500L
+        /** 通信の遅れを画面で確認できるよう、仮データでも少し待たせている。 */
+        const val API_DELAY_MS = 500L
 
-        /** API 実装までの仮データ。新しいものが先頭。 */
         val FAKE_RESPONSE = listOf(
             NoticeResponse("1", "CALL", "玄関からの呼び出しに応答がありませんでした", "TOP"),
             NoticeResponse("2", "ALERT", "フィルターの清掃時期です", "AIRCON"),

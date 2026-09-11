@@ -255,24 +255,26 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
 
 通知は **HTTP の API** から取る。機器との TCP とは経路が別なので、
-`AppStateHolder`（機器から降ってくる状態）は通らず、`NoticeRepositoryImpl` が
-自分で保持する。
+`AppStateHolder`（機器から降ってくる状態）は通らない。リポジトリも状態を持たず、
+保持するのは `SleepState` だけ。
+
+API は取得と消去の 2 本。UseCase もそれに 1 対 1 で対応する。
 
 ```
-SleepViewModel.init ─▶ SleepIntent.Started
-                        └▶ RefreshNoticesUseCase ─▶ NoticeRepositoryImpl.refresh()
-                                                     └▶ API（未実装。今は仮データ）
-                                                         └▶ notices: StateFlow が更新され、
-                                                             NoticesChanged として画面に戻る
+SleepIntent.Started          ─▶ GetNoticesUseCase   ─▶ GET    /notices
+SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notices
+                                                        └▶ GET /notices（取り直し）
+                                    どちらも結果は SleepIntent.NoticesLoaded として戻る
 ```
 
-取得と消去の結果はどちらも `notices` の `StateFlow` を通って戻る。画面は
-`ObserveNoticesUseCase` を購読するだけで、経路が 1 本に保たれる。
+消去が取り直しまで行うのは、消している間に届いた通知を落とさないため。
+呼び出し側から見れば「消した結果の一覧」が返るだけで、API が 2 本であることを知らずに済む。
+取得も消去も同じ Intent に戻るので、画面の経路は 1 本のままになる。
 
 スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
 失敗しても明示的な再試行ボタンは置いていない（次にスリープへ入れば取り直す）。
 
-**API はまだサーバ側が無い。** `NoticeRepositoryImpl.fetchFromApi()` が仮データを返しており、
+**API はまだサーバ側が無い。** `NoticeRepositoryImpl` が仮データを返しており、
 `TODO` を付けてある。差し替えるのはこのクラスの中だけで、UseCase から上は変わらない。
 エンドポイントは `AppConfig.apiBaseUrl`（flavor ごとに `buildConfigField` で設定）。
 

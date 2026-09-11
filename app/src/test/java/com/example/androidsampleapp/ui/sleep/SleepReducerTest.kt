@@ -12,6 +12,68 @@ class SleepReducerTest {
 
     private val reducer = SleepReducer()
 
+    private val notices = listOf(
+        Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
+    )
+
+    @Test
+    fun `Started で通知の取得中になる`() {
+        val next = reducer.reduce(SleepState(noticeLoadFailed = true), SleepIntent.Started)
+
+        assertTrue(next.isLoadingNotices)
+        assertFalse(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `消去を押したときも取得中になる`() {
+        // 消去は取り直しまで含む 1 つの操作なので、取得と同じ扱いにする。
+        val next = reducer.reduce(SleepState(), SleepIntent.ClearNoticesClicked)
+
+        assertTrue(next.isLoadingNotices)
+    }
+
+    @Test
+    fun `取得できた一覧が入る`() {
+        val next = reducer.reduce(
+            SleepState(isLoadingNotices = true),
+            SleepIntent.NoticesLoaded(notices),
+        )
+
+        assertEquals(notices, next.notices)
+        assertFalse(next.isLoadingNotices)
+    }
+
+    @Test
+    fun `消去後の空の一覧も同じ経路で入る`() {
+        val next = reducer.reduce(
+            SleepState(notices = notices, isLoadingNotices = true),
+            SleepIntent.NoticesLoaded(emptyList()),
+        )
+
+        assertTrue(next.notices.isEmpty())
+        assertFalse(next.isLoadingNotices)
+    }
+
+    @Test
+    fun `取得に失敗したら取得中が解けて失敗が立つ`() {
+        val next = reducer.reduce(
+            SleepState(isLoadingNotices = true),
+            SleepIntent.NoticesLoadFailed,
+        )
+
+        assertFalse(next.isLoadingNotices)
+        assertTrue(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `通知のタップは状態を変えない`() {
+        val state = SleepState(notices = notices)
+
+        val next = reducer.reduce(state, SleepIntent.NoticeClicked(notices.first()))
+
+        assertEquals(state, next)
+    }
+
     @Test
     fun `スワイプの進み具合が入る`() {
         val next = reducer.reduce(SleepState(), SleepIntent.UnlockDragged(0.4f))
@@ -43,9 +105,7 @@ class SleepReducerTest {
 
     @Test
     fun `途中で指を離すと進み具合が戻る`() {
-        val state = SleepState(unlockProgress = 0.8f)
-
-        val next = reducer.reduce(state, SleepIntent.UnlockCancelled)
+        val next = reducer.reduce(SleepState(unlockProgress = 0.8f), SleepIntent.UnlockCancelled)
 
         assertEquals(0f, next.unlockProgress, TOLERANCE)
     }
@@ -58,60 +118,6 @@ class SleepReducerTest {
 
         assertEquals(0.5f, next.unlockProgress, TOLERANCE)
         assertEquals("12:34", next.timeText)
-    }
-
-    @Test
-    fun `Started で通知の取得中になる`() {
-        val next = reducer.reduce(SleepState(noticeLoadFailed = true), SleepIntent.Started)
-
-        assertTrue(next.isLoadingNotices)
-        assertFalse(next.noticeLoadFailed)
-    }
-
-    @Test
-    fun `取得に失敗したら取得中が解けて失敗が立つ`() {
-        val next = reducer.reduce(
-            SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesLoadFailed,
-        )
-
-        assertFalse(next.isLoadingNotices)
-        assertTrue(next.noticeLoadFailed)
-    }
-
-    @Test
-    fun `受け取った通知が入る`() {
-        val notices = listOf(
-            Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
-        )
-
-        val next = reducer.reduce(SleepState(), SleepIntent.NoticesChanged(notices))
-
-        assertEquals(notices, next.notices)
-    }
-
-    @Test
-    fun `消去を押した時点では一覧を書き換えない`() {
-        // 実際に消えたかどうかは NoticesChanged で戻ってくる。先読みしない。
-        val state = SleepState(
-            notices = listOf(
-                Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
-            ),
-        )
-
-        val next = reducer.reduce(state, SleepIntent.ClearNoticesClicked)
-
-        assertEquals(state, next)
-    }
-
-    @Test
-    fun `通知のタップは状態を変えない`() {
-        val notice = Notice("1", NoticeCategory.AIRCON, "設定温度を変更", NoticeDestination.AIRCON)
-        val state = SleepState(notices = listOf(notice))
-
-        val next = reducer.reduce(state, SleepIntent.NoticeClicked(notice))
-
-        assertEquals(state, next)
     }
 
     private companion object {

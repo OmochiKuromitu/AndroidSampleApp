@@ -1,14 +1,12 @@
 package com.example.androidsampleapp.ui.sleep
 
 import com.example.androidsampleapp.core.mvi.UiState
-import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.Notice
 
 data class SleepState(
     val timeText: String = "",
     val dateText: String = "",
-    val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
-    /** API から受け取った通知。新しいものが先頭。 */
+    /** API から取った通知。新しいものが先頭。保持するのはここで、リポジトリは持たない。 */
     val notices: List<Notice> = emptyList(),
     val isLoadingNotices: Boolean = false,
     val noticeLoadFailed: Boolean = false,
