@@ -76,7 +76,7 @@ fun AppNavigation(
                 awaitPointerEventScope {
                     while (true) {
                         awaitPointerEvent(PointerEventPass.Initial)
-                        idleTimer.onInteraction()
+                        idleTimer.resetTimer()
                     }
                 }
             },

@@ -41,7 +41,7 @@ android {
             buildConfigField("int", "TCP_PORT", "50100")
             buildConfigField("int", "UDP_PORT", "50101")
             buildConfigField("boolean", "USE_FAKE_DEVICE", "false")
-            buildConfigField("long", "SLEEP_TIMEOUT_MS", "120000L")
+            buildConfigField("long", "SLEEP_TIMEOUT_MS", "30000L")
         }
     }
 

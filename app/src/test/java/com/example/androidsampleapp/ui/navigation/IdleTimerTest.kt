@@ -23,6 +23,71 @@ class IdleTimerTest {
     )
 
     @Test
+    fun `無操作が 30 秒続くとスリープになる`() = runTest {
+        val idleTimer = IdleTimer(config, backgroundScope)
+        runCurrent()
+
+        advanceTimeBy(29.seconds)
+        runCurrent()
+        assertFalse(idleTimer.isSleeping.value)
+
+        advanceTimeBy(2.seconds)
+        runCurrent()
+        assertTrue(idleTimer.isSleeping.value)
+    }
+
+    @Test
+    fun `resetTimer でタイムアウトが測り直される`() = runTest {
+        val idleTimer = IdleTimer(config, backgroundScope)
+        runCurrent()
+
+        advanceTimeBy(25.seconds)
+        idleTimer.resetTimer()
+        runCurrent()
+
+        // 起動からは 50 秒経っているが、最後の操作からはまだ 25 秒。
+        advanceTimeBy(25.seconds)
+        runCurrent()
+        assertFalse(idleTimer.isSleeping.value)
+
+        advanceTimeBy(6.seconds)
+        runCurrent()
+        assertTrue(idleTimer.isSleeping.value)
+    }
+
+    @Test
+    fun `pauseTimer の間はタイムアウトしない`() = runTest {
+        val idleTimer = IdleTimer(config, backgroundScope)
+        runCurrent()
+
+        idleTimer.pauseTimer()
+        advanceTimeBy(60.seconds)
+        runCurrent()
+
+        assertFalse(idleTimer.isSleeping.value)
+    }
+
+    @Test
+    fun `resumeTimer は状態を変えず測り直しから再開する`() = runTest {
+        val idleTimer = IdleTimer(config, backgroundScope)
+        runCurrent()
+
+        idleTimer.pauseTimer()
+        advanceTimeBy(20.seconds)
+        idleTimer.resumeTimer()
+        runCurrent()
+        assertFalse(idleTimer.isSleeping.value)
+
+        advanceTimeBy(29.seconds)
+        runCurrent()
+        assertFalse(idleTimer.isSleeping.value)
+
+        advanceTimeBy(2.seconds)
+        runCurrent()
+        assertTrue(idleTimer.isSleeping.value)
+    }
+
+    @Test
     fun `バックグラウンドに移ると無操作時間に関係なくスリープになる`() = runTest {
         val idleTimer = IdleTimer(config, backgroundScope)
         runCurrent()
@@ -54,53 +119,20 @@ class IdleTimerTest {
     }
 
     @Test
-    fun `無操作がタイムアウトするとスリープになる`() = runTest {
-        val idleTimer = IdleTimer(config, backgroundScope)
-        runCurrent()
-
-        advanceTimeBy(29.seconds)
-        runCurrent()
-        assertFalse(idleTimer.isSleeping.value)
-
-        advanceTimeBy(2.seconds)
-        runCurrent()
-        assertTrue(idleTimer.isSleeping.value)
-    }
-
-    @Test
-    fun `操作するとタイムアウトが測り直される`() = runTest {
-        val idleTimer = IdleTimer(config, backgroundScope)
-        runCurrent()
-
-        advanceTimeBy(25.seconds)
-        idleTimer.onInteraction()
-        runCurrent()
-
-        // 起動からは 50 秒経っているが、最後の操作からはまだ 25 秒。
-        advanceTimeBy(25.seconds)
-        runCurrent()
-        assertFalse(idleTimer.isSleeping.value)
-
-        advanceTimeBy(6.seconds)
-        runCurrent()
-        assertTrue(idleTimer.isSleeping.value)
-    }
-
-    @Test
     fun `スリープ中に触れただけでは復帰しない`() = runTest {
         // 触れただけで復帰すると、スリープ画面の解除操作を定義した意味がなくなる。
         val idleTimer = IdleTimer(config, backgroundScope)
         runCurrent()
         idleTimer.onEnteredBackground()
 
-        idleTimer.onInteraction()
+        idleTimer.resetTimer()
         runCurrent()
 
         assertTrue(idleTimer.isSleeping.value)
     }
 
     @Test
-    fun `wake で復帰する`() = runTest {
+    fun `wake で復帰し、そこから測り直す`() = runTest {
         val idleTimer = IdleTimer(config, backgroundScope)
         runCurrent()
         idleTimer.onEnteredBackground()
@@ -108,7 +140,10 @@ class IdleTimerTest {
 
         idleTimer.wake()
         runCurrent()
-
         assertFalse(idleTimer.isSleeping.value)
+
+        advanceTimeBy(31.seconds)
+        runCurrent()
+        assertTrue(idleTimer.isSleeping.value)
     }
 }

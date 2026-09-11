@@ -5,66 +5,74 @@ import com.example.androidsampleapp.di.ApplicationScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * スリープ状態の保持と、そこに入るかどうかの判断。きっかけは 4 つ。
+ * スリープ画面へ入る条件の判断と、スリープ状態の保持。
  *
- * - 無操作が [AppConfig.sleepTimeout] だけ続いた
+ * きっかけは 4 つ。
+ * - 無操作が [AppConfig.sleepTimeout] だけ続いた（どの画面でも）
  * - アプリがバックグラウンドに移った（[onEnteredBackground]）
  * - 電源ボタンなどで画面が消えた（[onScreenOff]）
  * - スリープタブが選ばれた（[onSleepRequested]）
  *
- * 状態を [com.example.androidsampleapp.core.AppStateHolder] ではなくここに置くのは、
- * 書き手がこのクラスだけで、読み手も [AppNavigation] だけだから。
- * AppStateHolder は機器から降ってくる状態を持つ場所として役割を分けている。
+ * ViewModel ではなく @Singleton なのは、上の 2 つを Application が拾う必要があるため。
+ * Application からは ViewModel に触れない。Composable からは [IdleTimerViewModel] が窓口になる。
+ *
+ * **タイマーと状態は分けてある。** [resetTimer] や [pauseTimer] はタイマーだけを操作し、
+ * [isSleeping] は変えない。状態を変えるのは [wake] とスリープのきっかけ 4 つだけ。
+ * 混ぜると「タイマーを再開したら勝手に起きた」のような挙動になる。
  *
  * 画面遷移そのものは行わない。[isSleeping] を見た [AppNavigation] が遷移する。
- * 判断と遷移を分けておくと、きっかけを増やしたときに navigation を触らずに済む。
+ *
+ * 呼び出しはすべてメインスレッドから来る前提（UI のイベントと Application の受信）。
  */
 @Singleton
 class IdleTimer @Inject constructor(
     private val config: AppConfig,
-    @ApplicationScope scope: CoroutineScope,
+    @ApplicationScope private val scope: CoroutineScope,
 ) {
 
     private val _isSleeping = MutableStateFlow(false)
     val isSleeping: StateFlow<Boolean> = _isSleeping.asStateFlow()
 
-    /** 操作のたびに増える。値そのものに意味はなく、タイマーの再起動の合図。 */
-    private val interactions = MutableStateFlow(0L)
+    private var timerJob: Job? = null
 
     init {
-        scope.launch {
-            interactions.collectLatest {
-                _isSleeping.value = false
-                delay(config.sleepTimeout)
-                _isSleeping.value = true
-            }
-        }
+        startTimer()
     }
 
     /**
-     * 画面が触られた。無操作タイマーを測り直す。
+     * ユーザー操作を検知したら呼ぶ。無操作タイマーを測り直す。
      *
-     * スリープ中は無視する。触れただけで解除されると、スリープ画面側で
-     * 解除操作（下からのスワイプ）を定義しても意味がなくなるため。
-     * 解除は [wake] を使う。
+     * スリープ中は何もしない。触れただけで解除されると、スリープ画面側で
+     * 解除操作（下からのスワイプ）を定義しても意味がなくなるため。解除は [wake]。
      */
-    fun onInteraction() {
+    fun resetTimer() {
         if (_isSleeping.value) return
-        interactions.update { it + 1 }
+        startTimer()
     }
 
-    /** スリープを解除する。解除操作や着信など、明示的に起こしたいときに呼ぶ。 */
+    /** タイマーを止める。状態は変えない。 */
+    fun pauseTimer() {
+        timerJob?.cancel()
+        timerJob = null
+    }
+
+    /** [pauseTimer] 後に測り直しから再開する。状態は変えない。 */
+    fun resumeTimer() {
+        if (timerJob?.isActive != true) startTimer()
+    }
+
+    /** スリープを解除して測り直す。解除操作や着信など、明示的に起こしたいときに呼ぶ。 */
     fun wake() {
-        interactions.update { it + 1 }
+        _isSleeping.value = false
+        startTimer()
     }
 
     /** アプリがバックグラウンドに移ったときに呼ぶ。 */
@@ -88,6 +96,15 @@ class IdleTimer @Inject constructor(
      * 戻ってきた最初の描画がスリープ画面になる。
      */
     private fun sleep() {
+        pauseTimer()
         _isSleeping.value = true
+    }
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        timerJob = scope.launch {
+            delay(config.sleepTimeout)
+            _isSleeping.value = true
+        }
     }
 }
