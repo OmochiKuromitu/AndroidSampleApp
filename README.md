@@ -65,9 +65,9 @@ Android Studio でこのディレクトリを開く。実行構成は 4 つ（mo
 State と Effect を分けるのが要点。遷移を State に持たせると、画面回転などの再生成のたびに
 同じ遷移が走る。逆に「選択中のタブ」を Effect にすると、復帰したときに復元できない。
 
-### ui/<feature> の 6 ファイル
+### ui/<feature> の 7 ファイル
 
-画面 1 つにつき、必ずこの 6 つを置く。ファイル名で役割が分かる状態を保つ。
+画面 1 つにつき、必ずこの 7 つを置く。ファイル名で役割が分かる状態を保つ。
 
 | ファイル | 中身 |
 | --- | --- |
@@ -76,23 +76,27 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface。遷移の命令は書かない |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
 | `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
-| `XxxScreen.kt` | Composable。State を描き、Intent を投げ、Effect を受ける |
+| `XxxRoute.kt` | 配線。ViewModel の取得、State の購読、Effect の受け取り、`LaunchedEffect` |
+| `XxxScreen.kt` | 表示。State を描き、操作を Intent として返すだけ |
 
-`XxxScreen.kt` の中はさらに 2 つに割ってある。
+**Route と Screen を分ける。**
 
-- `XxxScreen` — `hiltViewModel()` で ViewModel を取り、Effect を受ける。配線だけ。
-- `XxxContent` — `state` と `onIntent: (Intent) -> Unit` だけを受け取る private な Composable。
+- `XxxRoute` — `AppNavigation` から呼ばれる入口。`hiltViewModel()` で ViewModel を取り、
+  State を購読し、Effect を受けて呼び出し元のコールバックへ流す。`LaunchedEffect` もここ。
+- `XxxScreen` — `state` と `onIntent: (Intent) -> Unit` だけを受け取る。
+  ViewModel も Effect も知らない。
 
-割ってあるのはプレビューのため。`hiltViewModel()` はプレビューでは解決できないので、
-`XxxScreen` そのものは描画できない。状態を引数で渡せる `XxxContent` に
-`@PanelPreview` を付けて、State を差し替えながら見た目を確認する。
+Screen を表示だけに保つのが目的。副作用の配線が混ざると、見た目を直すつもりで
+ライフサイクルの都合を読む羽目になる。プレビューの都合もある。`hiltViewModel()` は
+プレビューで解決できないので、State を引数で渡せる `XxxScreen` に `@PanelPreview` を
+付けて、State を差し替えながら見た目を確認する。
 
 ```kotlin
 @PanelPreview
 @Composable
-private fun AirconContentOfflinePreview() {
+private fun AirconScreenOfflinePreview() {
     PreviewSurface {
-        AirconContent(
+        AirconScreen(
             state = AirconState(connectionState = ConnectionState.DISCONNECTED),
             onIntent = {},
         )
@@ -122,7 +126,7 @@ private fun AirconContentOfflinePreview() {
 
 | 出来事 | 誰が伝えるか | AppNavigation がすること |
 | --- | --- | --- |
-| タブがタップされた | `MainScreen` の `onTabClick` | そのタブへ navigate |
+| タブがタップされた | `MainRoute` の `onTabClick` | そのタブへ navigate |
 | スリープタブがタップされた | 同上 | `IdleTimer.onSleepRequested()`。遷移は下の行で起きる |
 | スリープ状態になった / 解けた | `IdleTimer.isSleeping` | スリープ画面へ navigate / 元のタブへ戻る |
 | 解除の操作が成立した | `SleepEffect.Unlocked` | `IdleTimer.wake()` |
@@ -132,12 +136,12 @@ private fun AirconContentOfflinePreview() {
 Effect の名前が `NavigateToXxx` ではなく `Unlocked` / `NoticeSelected` なのは意図的。
 ViewModel は出来事を報告するだけで、命令はしない。
 
-NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。`ui/main/MainScreen` は
-ヘッダーと下部バーの枠だけを描く Composable で、中身はスロットで受け取る。
+NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。呼ぶのは各画面の `XxxRoute`。
+`ui/main/MainRoute` はヘッダーと下部バーの枠で、中身はスロットで受け取る。
 スリープ画面だけこの枠を被せずに出す。
 
 選択中のタブは State に持たない。どのタブを表示しているかは NavController の現在地であって
-画面の状態ではないので、`AppNavigation` が決めて `MainScreen` に引数で渡す。
+画面の状態ではないので、`AppNavigation` が決めて `MainRoute` に引数で渡す。
 
 Composable には `@Inject` できないので、必要なものは ViewModel を窓口にして取る。
 Activity に持たせて引数で降ろす手もあるが、遷移に必要なものが増えるたびに
@@ -340,10 +344,10 @@ app/src/main/java/com/example/androidsampleapp/
     │                       + 責務ごとの窓口 ViewModel（IdleTimer / IncomingCall）
     ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
-    ├── main/               ヘッダーと BottomNaviBar の枠（MVI 6 ファイル + BottomNaviBar）
-    ├── top/                メイン画面に入れる画面（MVI 6 ファイル）
-    ├── aircon/             エアコン操作（MVI 6 ファイル）
-    └── sleep/              スリープ画面（MVI 6 ファイル）
+    ├── main/               ヘッダーと BottomNaviBar の枠（MVI 7 ファイル + BottomNaviBar）
+    ├── top/                メイン画面に入れる画面（MVI 7 ファイル）
+    ├── aircon/             エアコン操作（MVI 7 ファイル）
+    └── sleep/              スリープ画面（MVI 7 ファイル）
 ```
 
 `model/` と `domain/model/` の使い分け:
@@ -356,7 +360,7 @@ app/src/main/java/com/example/androidsampleapp/
 
 ### 足すとき
 
-- **画面を 1 つ足す** — `ui/<name>/` に 6 ファイル。ViewModel は `@HiltViewModel`。
+- **画面を 1 つ足す** — `ui/<name>/` に 7 ファイル。ViewModel は `@HiltViewModel`。
   遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。
 - **タブを 1 つ足す** — `Route` に 1 行、`MainTab` に 1 行、`AppNavigation` の NavHost に
   `composable` を 1 つ。
@@ -382,7 +386,7 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
   実装時は HTTP クライアント（Retrofit / Ktor など）の依存追加と、
   mock flavor の `http://` を叩くなら cleartext 許可の設定が要る。
 - 着信専用画面は作らず、トップ画面にカードとして出している。
-  専用画面にするなら `ui/call/` を 6 ファイルで足し、`IncomingCallRouter` の行き先を変える。
+  専用画面にするなら `ui/call/` を 7 ファイルで足し、`IncomingCallRouter` の行き先を変える。
 - State の `SavedStateHandle` 保存はしていない。プロセス終了からの復元が要るなら追加する。
 - 通知権限（Android 13 以降の `POST_NOTIFICATIONS`）の実行時リクエストは未実装。
   権限が無いと前面サービスの通知が出ないだけで、監視自体は動く。

@@ -9,17 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
-import com.example.androidsampleapp.core.mvi.CollectEffect
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.IncomingCall
@@ -30,30 +24,13 @@ import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
- * ViewModel と Effect の受け口。描画は [TopContent] が担う。
- * 分けてあるのは、プレビューで Hilt の ViewModel を解決できないため。
+ * トップ画面の表示。State を描き、操作を Intent として返すだけ。
+ * ViewModel も Effect も知らないので、そのままプレビューできる。
+ *
+ * 入口は [TopRoute]。
  */
 @Composable
 fun TopScreen(
-    snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
-    viewModel: TopViewModel = hiltViewModel(),
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            is TopEffect.ShowMessage ->
-                snackbarHostState.showSnackbar(context.getString(effect.messageRes))
-        }
-    }
-
-    TopContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
-}
-
-@Composable
-private fun TopContent(
     state: TopState,
     onIntent: (TopIntent) -> Unit,
     modifier: Modifier = Modifier,
@@ -155,9 +132,9 @@ private fun AirconSummaryCard(aircon: Aircon) {
 
 @PanelPreview
 @Composable
-private fun TopContentIdlePreview() {
+private fun TopScreenIdlePreview() {
     PreviewSurface {
-        TopContent(
+        TopScreen(
             state = TopState(
                 aircon = Aircon(
                     isOn = true,
@@ -173,9 +150,9 @@ private fun TopContentIdlePreview() {
 
 @PanelPreview
 @Composable
-private fun TopContentIncomingCallPreview() {
+private fun TopScreenIncomingCallPreview() {
     PreviewSurface {
-        TopContent(
+        TopScreen(
             state = TopState(
                 incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
                 aircon = Aircon(isOn = false, roomTemperature = 24.1),
@@ -187,9 +164,9 @@ private fun TopContentIncomingCallPreview() {
 
 @PanelPreview
 @Composable
-private fun TopContentSendingPreview() {
+private fun TopScreenSendingPreview() {
     PreviewSurface {
-        TopContent(
+        TopScreen(
             state = TopState(
                 incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
                 isSendingCommand = true,

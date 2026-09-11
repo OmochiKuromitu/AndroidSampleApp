@@ -17,13 +17,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.androidsampleapp.ui.aircon.AirconScreen
+import com.example.androidsampleapp.ui.aircon.AirconRoute
 import com.example.androidsampleapp.ui.common.Route
-import com.example.androidsampleapp.ui.main.MainScreen
+import com.example.androidsampleapp.ui.main.MainRoute
 import com.example.androidsampleapp.ui.main.MainTab
 import com.example.androidsampleapp.ui.main.toMainTab
-import com.example.androidsampleapp.ui.sleep.SleepScreen
-import com.example.androidsampleapp.ui.top.TopScreen
+import com.example.androidsampleapp.ui.sleep.SleepRoute
+import com.example.androidsampleapp.ui.top.TopRoute
 
 /**
  * アプリの遷移をすべてここで行う。
@@ -83,27 +83,27 @@ fun AppNavigation(
     ) {
         NavHost(navController = navController, startDestination = Route.TOP) {
             composable(Route.TOP) {
-                MainScreen(
+                MainRoute(
                     selectedTab = MainTab.TOP,
                     onTabClick = onTabClick,
                     snackbarHostState = snackbarHostState,
                 ) {
-                    TopScreen(snackbarHostState = snackbarHostState)
+                    TopRoute(snackbarHostState = snackbarHostState)
                 }
             }
 
             composable(Route.AIRCON) {
-                MainScreen(
+                MainRoute(
                     selectedTab = MainTab.AIRCON,
                     onTabClick = onTabClick,
                     snackbarHostState = snackbarHostState,
                 ) {
-                    AirconScreen(snackbarHostState = snackbarHostState)
+                    AirconRoute(snackbarHostState = snackbarHostState)
                 }
             }
 
             composable(Route.SLEEP) {
-                SleepScreen(
+                SleepRoute(
                     onUnlock = { idleTimer.wake() },
                     onNoticeSelected = { destination ->
                         navController.navigateToTab(destination.toMainTab())

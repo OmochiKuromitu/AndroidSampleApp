@@ -7,12 +7,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.ui.common.AppHeader
 import com.example.androidsampleapp.ui.common.CenteredMessage
@@ -20,35 +17,13 @@ import com.example.androidsampleapp.ui.common.PanelPreview
 import com.example.androidsampleapp.ui.common.PreviewSurface
 
 /**
- * ヘッダーと下部バーを持つ枠。中身は [content] として受け取る。
+ * ヘッダーと下部バーの枠。中身は [content] として受け取る。
+ * 表示だけを担当し、ViewModel は知らない。
  *
- * NavController は持たない。どのタブを表示しているかは AppNavigation が決めて
- * [selectedTab] で渡し、タップは [onTabClick] で返すだけ。
- * 遷移の判断と実行を 1 か所に寄せるため、この画面は見た目だけを担当する。
+ * 入口は [MainRoute]。
  */
 @Composable
 fun MainScreen(
-    selectedTab: MainTab,
-    onTabClick: (MainTab) -> Unit,
-    snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
-    viewModel: MainViewModel = hiltViewModel(),
-    content: @Composable () -> Unit,
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
-    MainContent(
-        state = state,
-        selectedTab = selectedTab,
-        onTabClick = onTabClick,
-        snackbarHostState = snackbarHostState,
-        modifier = modifier,
-        content = content,
-    )
-}
-
-@Composable
-private fun MainContent(
     state: MainState,
     selectedTab: MainTab,
     onTabClick: (MainTab) -> Unit,
@@ -75,9 +50,9 @@ private fun MainContent(
 
 @PanelPreview
 @Composable
-private fun MainContentConnectedPreview() {
+private fun MainScreenConnectedPreview() {
     PreviewSurface {
-        MainContent(
+        MainScreen(
             state = MainState(connectionState = ConnectionState.CONNECTED),
             selectedTab = MainTab.TOP,
             onTabClick = {},
@@ -90,9 +65,9 @@ private fun MainContentConnectedPreview() {
 
 @PanelPreview
 @Composable
-private fun MainContentDisconnectedPreview() {
+private fun MainScreenDisconnectedPreview() {
     PreviewSurface {
-        MainContent(
+        MainScreen(
             state = MainState(connectionState = ConnectionState.DISCONNECTED),
             selectedTab = MainTab.AIRCON,
             onTabClick = {},

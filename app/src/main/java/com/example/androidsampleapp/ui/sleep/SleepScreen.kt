@@ -17,7 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,10 +25,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
-import com.example.androidsampleapp.core.mvi.CollectEffect
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
@@ -46,28 +42,11 @@ import com.example.androidsampleapp.ui.theme.dimensions
  * 解除は画面下端の帯を上にスワイプしたときだけ。触れただけでは解除しないので、
  * 拭き掃除や誤接触で操作画面に戻らない。
  * ただし通知をタップした場合は、意図した操作とみなして復帰と遷移をまとめて行う。
+ *
+ * State を描き、操作を Intent として返すだけ。入口は [SleepRoute]。
  */
 @Composable
 fun SleepScreen(
-    onUnlock: () -> Unit,
-    onNoticeSelected: (NoticeDestination) -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: SleepViewModel = hiltViewModel(),
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            SleepEffect.Unlocked -> onUnlock()
-            is SleepEffect.NoticeSelected -> onNoticeSelected(effect.destination)
-        }
-    }
-
-    SleepContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
-}
-
-@Composable
-private fun SleepContent(
     state: SleepState,
     onIntent: (SleepIntent) -> Unit,
     modifier: Modifier = Modifier,
@@ -213,9 +192,9 @@ private val previewNotices = listOf(
 
 @PanelPreview
 @Composable
-private fun SleepContentPreview() {
+private fun SleepScreenPreview() {
     PreviewSurface {
-        SleepContent(
+        SleepScreen(
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
@@ -228,9 +207,9 @@ private fun SleepContentPreview() {
 
 @PanelPreview
 @Composable
-private fun SleepContentEmptyPreview() {
+private fun SleepScreenEmptyPreview() {
     PreviewSurface {
-        SleepContent(
+        SleepScreen(
             state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
             onIntent = {},
         )
@@ -239,9 +218,9 @@ private fun SleepContentEmptyPreview() {
 
 @PanelPreview
 @Composable
-private fun SleepContentLoadFailedPreview() {
+private fun SleepScreenLoadFailedPreview() {
     PreviewSurface {
-        SleepContent(
+        SleepScreen(
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
@@ -254,9 +233,9 @@ private fun SleepContentLoadFailedPreview() {
 
 @PanelPreview
 @Composable
-private fun SleepContentSwipingPreview() {
+private fun SleepScreenSwipingPreview() {
     PreviewSurface {
-        SleepContent(
+        SleepScreen(
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",

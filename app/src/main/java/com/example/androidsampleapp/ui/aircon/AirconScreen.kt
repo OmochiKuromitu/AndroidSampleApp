@@ -14,19 +14,13 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.androidsampleapp.R
-import com.example.androidsampleapp.core.mvi.CollectEffect
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.ConnectionState
@@ -35,29 +29,12 @@ import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
- * ViewModel と Effect の受け口。描画は [AirconContent] が担う。
+ * エアコン画面の表示。State を描き、操作を Intent として返すだけ。
+ *
+ * 入口は [AirconRoute]。
  */
 @Composable
 fun AirconScreen(
-    snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
-    viewModel: AirconViewModel = hiltViewModel(),
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            is AirconEffect.ShowMessage ->
-                snackbarHostState.showSnackbar(context.getString(effect.messageRes))
-        }
-    }
-
-    AirconContent(state = state, onIntent = viewModel::dispatch, modifier = modifier)
-}
-
-@Composable
-private fun AirconContent(
     state: AirconState,
     onIntent: (AirconIntent) -> Unit,
     modifier: Modifier = Modifier,
@@ -158,9 +135,9 @@ private fun TemperatureControl(
 
 @PanelPreview
 @Composable
-private fun AirconContentRunningPreview() {
+private fun AirconScreenRunningPreview() {
     PreviewSurface {
-        AirconContent(
+        AirconScreen(
             state = AirconState(
                 aircon = Aircon(
                     isOn = true,
@@ -177,9 +154,9 @@ private fun AirconContentRunningPreview() {
 
 @PanelPreview
 @Composable
-private fun AirconContentStoppedPreview() {
+private fun AirconScreenStoppedPreview() {
     PreviewSurface {
-        AirconContent(
+        AirconScreen(
             state = AirconState(
                 aircon = Aircon(isOn = false, roomTemperature = 22.0),
                 connectionState = ConnectionState.CONNECTED,
@@ -191,9 +168,9 @@ private fun AirconContentStoppedPreview() {
 
 @PanelPreview
 @Composable
-private fun AirconContentOfflinePreview() {
+private fun AirconScreenOfflinePreview() {
     PreviewSurface {
-        AirconContent(
+        AirconScreen(
             state = AirconState(connectionState = ConnectionState.DISCONNECTED),
             onIntent = {},
         )
