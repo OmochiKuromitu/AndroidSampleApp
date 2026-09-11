@@ -139,11 +139,23 @@ NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。`ui/main/MainScree
 選択中のタブは State に持たない。どのタブを表示しているかは NavController の現在地であって
 画面の状態ではないので、`AppNavigation` が決めて `MainScreen` に引数で渡す。
 
-必要なもの（`IdleTimer` と着信の `StateFlow`）は `AppNavigationViewModel` 経由で取る。
-Composable には `@Inject` できないので、誰かが渡す必要がある。Activity に持たせて
-引数で降ろす手もあるが、遷移に必要なものが増えるたびに `MainActivity` が太るため、
-ViewModel にして `AppNavigation` 側で閉じている。画面ではないので MVI は敷かず、
-状態を持たない素通しの窓口にしてある。
+Composable には `@Inject` できないので、必要なものは ViewModel を窓口にして取る。
+Activity に持たせて引数で降ろす手もあるが、遷移に必要なものが増えるたびに
+`MainActivity` が太るため、`AppNavigation` 側で閉じている。
+
+**窓口は責務ごとに分ける。**
+
+| 窓口 | 中身 | 使う場所 |
+| --- | --- | --- |
+| `SleepControlViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
+| `IncomingCallViewModel` | 着信の `StateFlow` | `IncomingCallRouter` |
+
+「`AppNavigation` が必要とするもの」という 1 つの入れ物にまとめない。それは責務ではなく、
+基準が無い入れ物は画面が増えるたびに無関係なものが同居して太る。
+1 つの窓口が変わる理由は 1 つに保つ。
+
+いずれも画面ではないので MVI は敷かず、状態を持たない素通しにしてある。
+状態の持ち主は `IdleTimer` と `AppStateHolder`。
 
 なお `App`（Application）は `IdleTimer` を直接注入している。こちらは
 `hiltViewModel()` が使えないため。`IdleTimer` が ViewModel ではなく `@Singleton`
@@ -318,7 +330,8 @@ app/src/main/java/com/example/androidsampleapp/
 ├── network/                TcpClient / MessageParser / UdpCommandClient
 ├── model/                  DeviceMessage（受信）/ CommandRequest（送信）/ MasterData
 └── ui/
-    ├── navigation/         AppNavigation / AppNavigationViewModel / IncomingCallRouter / IdleTimer
+    ├── navigation/         AppNavigation / IncomingCallRouter / IdleTimer
+    │                       + 責務ごとの窓口 ViewModel（SleepControl / IncomingCall）
     ├── common/             Route / AppHeader / NoticeList / 共通コンポーネント / プレビュー定義
     ├── theme/              Color / Type / Dimensions / Theme
     ├── main/               ヘッダーと BottomNaviBar の枠（MVI 6 ファイル + BottomNaviBar）

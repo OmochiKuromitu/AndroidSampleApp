@@ -3,9 +3,8 @@ package com.example.androidsampleapp.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.androidsampleapp.domain.model.IncomingCall
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 着信を検知して知らせるだけ。何をするかは呼び出し側（[AppNavigation]）が決める。
@@ -14,12 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @Composable
 fun IncomingCallRouter(
-    incomingCall: StateFlow<IncomingCall?>,
     onIncomingCall: () -> Unit,
+    viewModel: IncomingCallViewModel = hiltViewModel(),
 ) {
-    val current by incomingCall.collectAsStateWithLifecycle()
+    val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
 
-    LaunchedEffect(current) {
-        if (current != null) onIncomingCall()
+    LaunchedEffect(incomingCall) {
+        if (incomingCall != null) onIncomingCall()
     }
 }

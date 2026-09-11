@@ -37,16 +37,16 @@ import com.example.androidsampleapp.ui.top.TopScreen
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
-    viewModel: AppNavigationViewModel = hiltViewModel(),
+    sleepControl: SleepControlViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-    val isSleeping by viewModel.isSleeping.collectAsStateWithLifecycle()
+    val isSleeping by sleepControl.isSleeping.collectAsStateWithLifecycle()
 
     // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
-    IncomingCallRouter(incomingCall = viewModel.incomingCall) {
+    IncomingCallRouter {
         navController.navigateToTab(MainTab.TOP)
-        viewModel.wake()
+        sleepControl.wake()
     }
 
     LaunchedEffect(isSleeping) {
@@ -62,7 +62,7 @@ fun AppNavigation(
 
     val onTabClick: (MainTab) -> Unit = { tab ->
         // スリープは画面ではなく状態。遷移は isSleeping を見た上の LaunchedEffect が行う。
-        if (tab == MainTab.SLEEP) viewModel.onSleepRequested() else navController.navigateToTab(tab)
+        if (tab == MainTab.SLEEP) sleepControl.onSleepRequested() else navController.navigateToTab(tab)
     }
 
     Box(
@@ -74,7 +74,7 @@ fun AppNavigation(
                 awaitPointerEventScope {
                     while (true) {
                         awaitPointerEvent(PointerEventPass.Initial)
-                        viewModel.onInteraction()
+                        sleepControl.onInteraction()
                     }
                 }
             },
@@ -102,10 +102,10 @@ fun AppNavigation(
 
             composable(Route.SLEEP) {
                 SleepScreen(
-                    onUnlock = { viewModel.wake() },
+                    onUnlock = { sleepControl.wake() },
                     onNoticeSelected = { destination ->
                         navController.navigateToTab(destination.toMainTab())
-                        viewModel.wake()
+                        sleepControl.wake()
                     },
                 )
             }
