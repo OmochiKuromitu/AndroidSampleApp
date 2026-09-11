@@ -360,6 +360,10 @@ app/src/main/java/com/example/androidsampleapp/
 
 ### 足すとき
 
+手順と雛形は `.claude/skills/android-screen/SKILL.md` にまとめてある。
+Claude Code はこのリポジトリで作業するとき自動で参照する。
+このドキュメントが「なぜそうなっているか」、スキルが「何をどこへ書くか」を持つ。
+
 - **画面を 1 つ足す** — `ui/<name>/` に 7 ファイル。ViewModel は `@HiltViewModel`。
   遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。
 - **タブを 1 つ足す** — `Route` に 1 行、`MainTab` に 1 行、`AppNavigation` の NavHost に
