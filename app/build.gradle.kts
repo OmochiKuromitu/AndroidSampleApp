@@ -28,6 +28,7 @@ android {
             applicationIdSuffix = ".mock"
             versionNameSuffix = "-mock"
             buildConfigField("String", "DEVICE_HOST", "\"127.0.0.1\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:8080/api\"")
             buildConfigField("int", "TCP_PORT", "50100")
             buildConfigField("int", "UDP_PORT", "50101")
             buildConfigField("boolean", "USE_FAKE_DEVICE", "true")
@@ -36,6 +37,7 @@ android {
         create("product") {
             dimension = "environment"
             buildConfigField("String", "DEVICE_HOST", "\"192.168.10.20\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://192.168.10.20/api\"")
             buildConfigField("int", "TCP_PORT", "50100")
             buildConfigField("int", "UDP_PORT", "50101")
             buildConfigField("boolean", "USE_FAKE_DEVICE", "false")

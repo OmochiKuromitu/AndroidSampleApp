@@ -4,6 +4,11 @@ import com.example.androidsampleapp.core.mvi.Reducer
 
 class SleepReducer : Reducer<SleepState, SleepIntent> {
     override fun reduce(state: SleepState, intent: SleepIntent): SleepState = when (intent) {
+        SleepIntent.Started -> state.copy(isLoadingNotices = true, noticeLoadFailed = false)
+        SleepIntent.NoticesLoaded -> state.copy(isLoadingNotices = false)
+        SleepIntent.NoticesLoadFailed ->
+            state.copy(isLoadingNotices = false, noticeLoadFailed = true)
+
         is SleepIntent.Ticked -> state.copy(timeText = intent.timeText, dateText = intent.dateText)
         is SleepIntent.ConnectionStateChanged -> state.copy(connectionState = intent.state)
         is SleepIntent.NoticesChanged -> state.copy(notices = intent.notices)

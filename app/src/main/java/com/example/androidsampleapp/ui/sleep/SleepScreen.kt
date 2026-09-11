@@ -33,6 +33,8 @@ import com.example.androidsampleapp.core.mvi.CollectEffect
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
+import com.example.androidsampleapp.ui.common.CenteredMessage
+import com.example.androidsampleapp.ui.common.LoadingBox
 import com.example.androidsampleapp.ui.common.NoticeList
 import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.common.PanelPreview
@@ -100,13 +102,29 @@ private fun SleepContent(
                 color = Color.White.copy(alpha = 0.7f),
             )
 
-            NoticeList(
-                notices = state.notices,
-                onNoticeClick = { onIntent(SleepIntent.NoticeClicked(it)) },
-                onClearClick = { onIntent(SleepIntent.ClearNoticesClicked) },
-                contentColor = Color.White,
-                modifier = Modifier.padding(top = dimensions.spaceLarge),
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = dimensions.spaceLarge),
+            ) {
+                when {
+                    // 取得済みの一覧があるなら、読み込み中でもそれを出したままにする。
+                    state.isLoadingNotices && state.notices.isEmpty() -> LoadingBox()
+
+                    state.noticeLoadFailed && state.notices.isEmpty() -> CenteredMessage(
+                        message = stringResource(R.string.notice_load_failed),
+                        color = Color.White.copy(alpha = 0.6f),
+                    )
+
+                    else -> NoticeList(
+                        notices = state.notices,
+                        onNoticeClick = { onIntent(SleepIntent.NoticeClicked(it)) },
+                        onClearClick = { onIntent(SleepIntent.ClearNoticesClicked) },
+                        contentColor = Color.White,
+                    )
+                }
+            }
         }
 
         UnlockArea(
@@ -214,6 +232,21 @@ private fun SleepContentEmptyPreview() {
     PreviewSurface {
         SleepContent(
             state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
+            onIntent = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepContentLoadFailedPreview() {
+    PreviewSurface {
+        SleepContent(
+            state = SleepState(
+                timeText = "21:47",
+                dateText = "9月10日 (水)",
+                noticeLoadFailed = true,
+            ),
             onIntent = {},
         )
     }

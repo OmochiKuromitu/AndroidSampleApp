@@ -5,6 +5,7 @@ import com.example.androidsampleapp.core.mvi.MviViewModel
 import com.example.androidsampleapp.domain.usecase.ClearNoticesUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveConnectionStateUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveNoticesUseCase
+import com.example.androidsampleapp.domain.usecase.RefreshNoticesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 class SleepViewModel @Inject constructor(
     observeConnectionState: ObserveConnectionStateUseCase,
     observeNotices: ObserveNoticesUseCase,
+    private val refreshNotices: RefreshNoticesUseCase,
     private val clearNotices: ClearNoticesUseCase,
 ) : MviViewModel<SleepState, SleepIntent, SleepEffect>(
     initialState = SleepState(),
@@ -38,14 +40,20 @@ class SleepViewModel @Inject constructor(
         viewModelScope.launch {
             observeConnectionState().collect { dispatch(SleepIntent.ConnectionStateChanged(it)) }
         }
-        // StateFlow なので、購読した時点で今ある一覧がそのまま流れてくる。
+        // 保持している一覧を購読する。取得も消去も結果はここに流れてくる。
         viewModelScope.launch {
             observeNotices().collect { dispatch(SleepIntent.NoticesChanged(it)) }
         }
+        dispatch(SleepIntent.Started)
     }
 
     override suspend fun handle(intent: SleepIntent, previous: SleepState, current: SleepState) {
         when (intent) {
+            // スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
+            SleepIntent.Started -> loadNotices()
+
+            SleepIntent.ClearNoticesClicked -> clearNotices()
+
             // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
             is SleepIntent.UnlockDragged ->
                 if (!previous.isUnlockReached && current.isUnlockReached) {
@@ -55,14 +63,20 @@ class SleepViewModel @Inject constructor(
             is SleepIntent.NoticeClicked ->
                 sendEffect(SleepEffect.OpenDestination(intent.notice.destination))
 
-            SleepIntent.ClearNoticesClicked -> clearNotices()
-
             SleepIntent.UnlockCancelled,
+            SleepIntent.NoticesLoaded,
+            SleepIntent.NoticesLoadFailed,
             is SleepIntent.Ticked,
             is SleepIntent.ConnectionStateChanged,
             is SleepIntent.NoticesChanged,
             -> Unit
         }
+    }
+
+    private suspend fun loadNotices() {
+        runCatching { refreshNotices() }
+            .onSuccess { dispatch(SleepIntent.NoticesLoaded) }
+            .onFailure { dispatch(SleepIntent.NoticesLoadFailed) }
     }
 
     private companion object {

@@ -209,11 +209,29 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 
 ### スリープ画面の通知一覧
 
-時刻表示の下に、機器から受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
+時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
 
-通知は `TCP` の `NOTICE|<分類>|<本文>|<飛び先>` を `DeviceRepositoryImpl` が
-`AppStateHolder` に積んだもの。`SleepViewModel` は `ObserveNoticesUseCase` の
-`StateFlow` を購読するので、init の時点で今ある一覧がそのまま流れてくる。
+通知は **HTTP の API** から取る。機器との TCP とは経路が別なので、
+`AppStateHolder`（機器から降ってくる状態）は通らず、`NoticeRepositoryImpl` が
+自分で保持する。
+
+```
+SleepViewModel.init ─▶ SleepIntent.Started
+                        └▶ RefreshNoticesUseCase ─▶ NoticeRepositoryImpl.refresh()
+                                                     └▶ API（未実装。今は仮データ）
+                                                         └▶ notices: StateFlow が更新され、
+                                                             NoticesChanged として画面に戻る
+```
+
+取得と消去の結果はどちらも `notices` の `StateFlow` を通って戻る。画面は
+`ObserveNoticesUseCase` を購読するだけで、経路が 1 本に保たれる。
+
+スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
+失敗しても明示的な再試行ボタンは置いていない（次にスリープへ入れば取り直す）。
+
+**API はまだサーバ側が無い。** `NoticeRepositoryImpl.fetchFromApi()` が仮データを返しており、
+`TODO` を付けてある。差し替えるのはこのクラスの中だけで、UseCase から上は変わらない。
+エンドポイントは `AppConfig.apiBaseUrl`（flavor ごとに `buildConfigField` で設定）。
 
 **飛び先は通知自身が持つ。**
 
@@ -295,7 +313,8 @@ app/src/main/java/com/example/androidsampleapp/
 
 `model/` と `domain/model/` の使い分け:
 
-- `model/` — 通信の語彙。受信した 1 行の解釈結果、送るコマンド、機器仕様の固定値。
+- `model/` — 通信の語彙。受信した 1 行の解釈結果、送るコマンド、API のレスポンス、
+  機器仕様の固定値。
 - `domain/model/` — アプリが扱う語彙。画面と UseCase はこちらだけを見る。
 
 変換は data 層（`DeviceRepositoryImpl`）が担う。プロトコルが変わっても影響を network と data に閉じる。
@@ -322,6 +341,9 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
 
 - 通信プロトコルは `|` 区切りのテキストという仮のもの。実仕様に合わせて
   `MessageParser` と `CommandRequest` を差し替える。
+- 通知取得 API は未実装。`NoticeRepositoryImpl` が仮データを返している。
+  実装時は HTTP クライアント（Retrofit / Ktor など）の依存追加と、
+  mock flavor の `http://` を叩くなら cleartext 許可の設定が要る。
 - 着信専用画面は作らず、トップ画面にカードとして出している。
   専用画面にするなら `ui/call/` を 6 ファイルで足し、`IncomingCallRouter` の行き先を変える。
 - State の `SavedStateHandle` 保存はしていない。プロセス終了からの復元が要るなら追加する。

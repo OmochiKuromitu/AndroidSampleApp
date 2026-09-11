@@ -8,8 +8,10 @@ data class SleepState(
     val timeText: String = "",
     val dateText: String = "",
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
-    /** 受け取った通知。新しいものが先頭。 */
+    /** API から受け取った通知。新しいものが先頭。 */
     val notices: List<Notice> = emptyList(),
+    val isLoadingNotices: Boolean = false,
+    val noticeLoadFailed: Boolean = false,
     /**
      * 解除スワイプの進み具合。0f = 触っていない、1f = 解除に必要な距離に到達。
      * 指の動きに合わせて手応えを返すために状態として持つ。

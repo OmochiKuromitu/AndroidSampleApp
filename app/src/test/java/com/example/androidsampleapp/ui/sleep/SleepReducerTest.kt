@@ -61,6 +61,25 @@ class SleepReducerTest {
     }
 
     @Test
+    fun `Started で通知の取得中になる`() {
+        val next = reducer.reduce(SleepState(noticeLoadFailed = true), SleepIntent.Started)
+
+        assertTrue(next.isLoadingNotices)
+        assertFalse(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `取得に失敗したら取得中が解けて失敗が立つ`() {
+        val next = reducer.reduce(
+            SleepState(isLoadingNotices = true),
+            SleepIntent.NoticesLoadFailed,
+        )
+
+        assertFalse(next.isLoadingNotices)
+        assertTrue(next.noticeLoadFailed)
+    }
+
+    @Test
     fun `受け取った通知が入る`() {
         val notices = listOf(
             Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
