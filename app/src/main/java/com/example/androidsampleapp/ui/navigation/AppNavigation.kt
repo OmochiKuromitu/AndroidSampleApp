@@ -44,10 +44,12 @@ fun AppNavigation(
     val isSleeping by sleepControl.isSleeping.collectAsStateWithLifecycle()
 
     // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
-    IncomingCallRouter {
-        navController.navigateToTab(MainTab.TOP)
-        sleepControl.wake()
-    }
+    IncomingCallRouter(
+        onIncomingCall = {
+            navController.navigateToTab(MainTab.TOP)
+            sleepControl.wake()
+        },
+    )
 
     LaunchedEffect(isSleeping) {
         if (isSleeping) {
