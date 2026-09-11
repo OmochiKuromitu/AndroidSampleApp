@@ -16,6 +16,9 @@ import kotlinx.coroutines.delay
 @Singleton
 class ContactRepositoryImpl @Inject constructor() : ContactRepository {
 
+    /** TODO: API ができたら削除する。本来はサーバが持つ、未確認の不在着信の件数。 */
+    private var fakeServerMissedCallCount: Int = FAKE_HISTORIES.count { it.missed }
+
     override suspend fun getContacts(): List<Contact> {
         // TODO: GET {AppConfig.apiBaseUrl}/contacts に置き換える。
         delay(API_DELAY_MS)
@@ -31,7 +34,13 @@ class ContactRepositoryImpl @Inject constructor() : ContactRepository {
     override suspend fun getMissedCallCount(): Int {
         // TODO: GET {AppConfig.apiBaseUrl}/missed-calls に置き換える。
         delay(API_DELAY_MS)
-        return FAKE_HISTORIES.count { it.missed }
+        return fakeServerMissedCallCount
+    }
+
+    override suspend fun markMissedCallsAsRead() {
+        // TODO: POST {AppConfig.apiBaseUrl}/missed-calls/read に置き換える。
+        delay(API_DELAY_MS)
+        fakeServerMissedCallCount = 0
     }
 
     private fun ContactResponse.toDomain(): Contact = Contact(

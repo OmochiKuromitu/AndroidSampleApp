@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    missedCallManager: MissedCallManager,
+    private val missedCallManager: MissedCallManager,
     private val getContacts: GetContactsUseCase,
     private val getCallHistories: GetCallHistoriesUseCase,
 ) : MviViewModel<ContactState, ContactIntent, ContactEffect>(
@@ -41,9 +41,17 @@ class ContactViewModel @Inject constructor(
         when (intent) {
             // 両方まとめて取る。リストの切り替えは表示の出し分けだけにして、
             // タブを触るたびに通信が走らないようにする。
-            ContactIntent.Started -> load()
+            ContactIntent.Started -> {
+                load()
+                // 履歴から開いたなら、その時点で見せたことになる。
+                if (current.selectedList == ContactList.HISTORY) missedCallManager.markAsRead()
+            }
 
-            is ContactIntent.ListSelected,
+            // 履歴を見せたので既読にする。件数で間引かないのは、件数がまだ届いていない
+            // タイミングで開かれると取りこぼすため。既読 API は何度呼んでも同じ結果になる前提。
+            is ContactIntent.ListSelected ->
+                if (intent.list == ContactList.HISTORY) missedCallManager.markAsRead()
+
             is ContactIntent.Loaded,
             ContactIntent.LoadFailed,
             is ContactIntent.MissedCallCountChanged,

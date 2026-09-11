@@ -2,6 +2,7 @@ package com.example.androidsampleapp.core
 
 import com.example.androidsampleapp.di.ApplicationScope
 import com.example.androidsampleapp.domain.usecase.GetMissedCallCountUseCase
+import com.example.androidsampleapp.domain.usecase.MarkMissedCallsAsReadUseCase
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -21,12 +22,15 @@ import kotlinx.coroutines.launch
  * （[com.example.androidsampleapp.ui.navigation.AppNavigation]）が決める。
  * タイマーで叩き続けないのは、画面が切り替わる瞬間に取れば十分だから。
  *
+ * 既読は [markAsRead]。履歴を見せた時点で連絡先画面が呼ぶ。
+ *
  * ViewModel ではなく @Singleton なのは、画面をまたいで同じ件数を見せるため。
  * 保持は Hilt の SingletonComponent が行う（Application と同じ寿命）。
  */
 @Singleton
 class MissedCallManager @Inject constructor(
     private val getMissedCallCount: GetMissedCallCountUseCase,
+    private val markMissedCallsAsRead: MarkMissedCallsAsReadUseCase,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
 
@@ -47,6 +51,21 @@ class MissedCallManager @Inject constructor(
         if (inFlight?.isActive == true) return
         inFlight = scope.launch {
             runCatching { getMissedCallCount() }
+                .onSuccess { _missedCallCount.value = it }
+        }
+    }
+
+    /**
+     * 既読にする。履歴を見せた時点で呼ぶ。
+     *
+     * [refresh] と違って取りやめない。利用者の操作の結果なので、落とすと
+     * 見たのにバッジが残る。実行中の取得があれば打ち切る。既読のあとに取り直すので、
+     * 古い件数で上書きされるのを防ぐため。
+     */
+    fun markAsRead() {
+        inFlight?.cancel()
+        inFlight = scope.launch {
+            runCatching { markMissedCallsAsRead() }
                 .onSuccess { _missedCallCount.value = it }
         }
     }

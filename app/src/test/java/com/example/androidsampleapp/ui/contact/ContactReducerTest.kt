@@ -63,8 +63,9 @@ class ContactReducerTest {
     }
 
     @Test
-    fun `リストを切り替えてもバッジの件数は変わらない`() {
-        // 履歴を見ただけでは既読にしない。既読の API ができたらここが変わる。
+    fun `リストの切り替えでは件数を先読みしない`() {
+        // 既読にするのは ViewModel の副作用側で、結果は MissedCallCountChanged で戻る。
+        // Reducer が先に 0 にすると、既読 API が失敗したときに件数が消えたままになる。
         val state = ContactState(missedCallCount = 2)
 
         val next = reducer.reduce(state, ContactIntent.ListSelected(ContactList.HISTORY))

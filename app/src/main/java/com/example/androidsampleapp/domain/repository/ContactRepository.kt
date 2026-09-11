@@ -16,4 +16,7 @@ interface ContactRepository {
 
     /** 不在着信取得 API。未確認の件数を返す。 */
     suspend fun getMissedCallCount(): Int
+
+    /** 不在着信既読 API。未確認の印を消す。 */
+    suspend fun markMissedCallsAsRead()
 }

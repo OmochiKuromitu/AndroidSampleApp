@@ -335,11 +335,24 @@ NoticeClicked ─▶ Reducer（状態は変えない）
 
 ```
 AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後）
-  └▶ MissedCallManager.refresh() ─▶ GET /missed-calls（未実装。今は仮データ）
+  └▶ MissedCallManager.refresh() ─▶ GET /missed-calls
                                      └▶ missedCallCount: StateFlow
                                          ├▶ MainViewModel   → 下部バーのバッジ
                                          └▶ ContactViewModel → 履歴タブのバッジ
+
+ContactViewModel（履歴タブを見せた）
+  └▶ MissedCallManager.markAsRead() ─▶ POST /missed-calls/read
+                                        └▶ GET /missed-calls（取り直し）
+                                            └▶ 同じ StateFlow に戻る
 ```
+
+既読は履歴タブを見せた時点で呼ぶ。連絡先画面を履歴から開いたとき（通知経由）と、
+画面内で履歴タブに切り替えたときの 2 か所。件数で間引かないのは、件数がまだ届いていない
+タイミングで開かれると取りこぼすため。既読 API は何度呼んでも同じ結果になる前提。
+
+既読のあとに取り直すのは、既読にしている間に届いた分を落とさないため
+（`ClearNoticesUseCase` と同じ形）。Reducer は件数を先読みしない。先に 0 にすると、
+既読 API が失敗したときに件数が消えたままになる。
 
 **取得のきっかけは画面の切り替え。** HTTP なので黙っていても届かないが、タイマーで
 叩き続けるほどの鮮度は要らない。切り替わる節目で取れば足りる。きっかけを決めるのは
@@ -348,6 +361,10 @@ AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後�
 `refresh()` は実行中の要求があれば何もしない。タブを続けて叩かれたときに、同じ要求が
 重なって遅い順に上書きされるのを防ぐため。失敗しても前回の件数を残す。通信が一度
 こけただけでバッジが消えると、不在着信を見落とす方に倒れる。
+
+`markAsRead()` は逆に取りやめない。利用者が履歴を見た結果なので、落とすと見たのに
+バッジが残る。実行中の取得があれば打ち切る（既読のあとに取り直すので、古い件数で
+上書きされるのを防ぐ）。
 
 ViewModel ではなく `@Singleton` なのは、画面をまたいで同じ件数を見せるため。
 保持は Hilt の `SingletonComponent` が行う（Application と同じ寿命）。`App` に
@@ -438,7 +455,8 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
 
 - 通信プロトコルは `|` 区切りのテキストという仮のもの。実仕様に合わせて
   `MessageParser` と `CommandRequest` を差し替える。
-- 通知取得 API は未実装。`NoticeRepositoryImpl` が仮データを返している。
+- 通知取得 API と連絡先まわりの API（電話帳 / 履歴 / 不在着信の取得・既読）は未実装。
+  `NoticeRepositoryImpl` と `ContactRepositoryImpl` が仮データを返している。
   実装時は HTTP クライアント（Retrofit / Ktor など）の依存追加と、
   mock flavor の `http://` を叩くなら cleartext 許可の設定が要る。
 - 着信専用画面は作らず、トップ画面にカードとして出している。
