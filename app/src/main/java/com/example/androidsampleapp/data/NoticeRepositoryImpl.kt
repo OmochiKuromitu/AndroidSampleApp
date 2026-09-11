@@ -46,7 +46,7 @@ class NoticeRepositoryImpl @Inject constructor() : NoticeRepository {
         const val API_DELAY_MS = 500L
 
         val FAKE_RESPONSE = listOf(
-            NoticeResponse("1", "CALL", "玄関からの呼び出しに応答がありませんでした", "TOP"),
+            NoticeResponse("1", "CALL", "玄関からの呼び出しに応答がありませんでした", "CONTACT_MISSED"),
             NoticeResponse("2", "ALERT", "フィルターの清掃時期です", "AIRCON"),
             NoticeResponse("3", "AIRCON", "リビングの設定温度を 26.0 度に変更しました", "AIRCON"),
             NoticeResponse("4", "INFO", "システムを起動しました", "TOP"),

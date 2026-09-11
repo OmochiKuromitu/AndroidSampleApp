@@ -13,7 +13,7 @@ class SleepReducerTest {
     private val reducer = SleepReducer()
 
     private val notices = listOf(
-        Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.TOP),
+        Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.Top),
     )
 
     @Test

@@ -3,7 +3,7 @@
 Jetpack Compose + MVI の Android アプリ。壁付けの操作パネルを想定していて、
 機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばスリープ画面に落ちる。
 
-- 下部バーで 3 タブ（トップ / エアコン / スリープ）
+- 下部バーで 4 タブ（トップ / エアコン / 連絡先 / スリープ）
 - 画面遷移も含めて Intent → Reducer を通す
 - flavor は `mock`（実機不要）と `product`（実機接続）
 
@@ -136,7 +136,7 @@ private fun AirconScreenOfflinePreview() {
 Effect の名前が `NavigateToXxx` ではなく `Unlocked` / `NoticeSelected` なのは意図的。
 ViewModel は出来事を報告するだけで、命令はしない。
 
-NavHost は 1 つで、`top` / `aircon` / `sleep` を持つ。呼ぶのは各画面の `XxxRoute`。
+NavHost は 1 つで、`top` / `aircon` / `contact` / `sleep` を持つ。呼ぶのは各画面の `XxxRoute`。
 行き先は `Route` の定数だけで指定し、どのタブを選択状態にするかは
 `MainTab.fromRoute()` がそこから引く。ルートとタブを別々に書くとずれるため。
 `ui/main/MainRoute` はヘッダーと下部バーの枠で、中身はスロットで受け取る。
@@ -166,6 +166,27 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 なお `App`（Application）は `IdleTimer` を直接注入している。こちらは
 `hiltViewModel()` が使えないため。`IdleTimer` が ViewModel ではなく `@Singleton`
 である理由もここにある。
+
+### 画面に値を渡す
+
+`contact` だけルートに引数を持つ。スリープ画面の通知から「不在着信があった」で飛んだときに、
+電話帳ではなく履歴から開くため。
+
+```
+通知（destination = CONTACT_MISSED）
+  └▶ NoticeDestination.Contact(hasMissedCall = true)     ← ドメインは事実だけを持つ
+      └▶ toRoute() ─▶ "contact?list=history"             ← ui 層が「だから履歴」と決める
+          └▶ ContactViewModel が SavedStateHandle から受け取り、初期状態のタブにする
+```
+
+飛び先の型を `enum` から `sealed interface` にしたのは、飛び先によって
+伴う情報が違うため。`Contact` だけが不在フラグを持つ。
+
+引数は初期状態として `initialState` で解決する。Intent にすると、取得が終わる前に
+一瞬だけ電話帳が見えてから履歴へ切り替わる。
+
+引数つきのルートへ飛ぶときは `restoreState` を使わない。復元すると保存済みのエントリが
+そのまま戻り、新しく渡した引数が無視されるため（`navigateToRoute(route, restore = false)`）。
 
 ### 共有状態 — AppStateHolder
 
@@ -351,6 +372,7 @@ app/src/main/java/com/example/androidsampleapp/
     ├── main/               ヘッダーと BottomNaviBar の枠（MVI 7 ファイル + BottomNaviBar）
     ├── top/                メイン画面に入れる画面（MVI 7 ファイル）
     ├── aircon/             エアコン操作（MVI 7 ファイル）
+    ├── contact/            連絡先。画面内で電話帳と履歴を出し分ける（MVI 7 ファイル）
     └── sleep/              スリープ画面（MVI 7 ファイル）
 ```
 

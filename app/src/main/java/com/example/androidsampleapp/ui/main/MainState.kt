@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.androidsampleapp.R
@@ -23,6 +24,7 @@ enum class MainTab(
 ) {
     TOP(Route.TOP, R.string.tab_top, Icons.Filled.Home),
     AIRCON(Route.AIRCON, R.string.tab_aircon, Icons.Filled.AcUnit),
+    CONTACT(Route.CONTACT, R.string.tab_contact, Icons.Filled.Contacts),
     SLEEP(Route.SLEEP, R.string.tab_sleep, Icons.Filled.Bedtime),
     ;
 
@@ -41,11 +43,15 @@ enum class MainTab(
 }
 
 /**
- * 通知の飛び先をタブに対応させる。ドメインは画面の住所を知らないので、変換はここに置く。
+ * 通知の飛び先をルート文字列に対応させる。ドメインは画面の住所を知らないので、変換はここに置く。
+ *
+ * 不在着信だったかどうかは飛び先の値として渡ってくるが、「だから履歴タブを開く」と
+ * 決めるのはここ。ドメインは不在だったという事実しか持たない。
  */
-fun NoticeDestination.toMainTab(): MainTab = when (this) {
-    NoticeDestination.TOP -> MainTab.TOP
-    NoticeDestination.AIRCON -> MainTab.AIRCON
+fun NoticeDestination.toRoute(): String = when (this) {
+    NoticeDestination.Top -> Route.TOP
+    NoticeDestination.Aircon -> Route.AIRCON
+    is NoticeDestination.Contact -> Route.contact(showHistory = hasMissedCall)
 }
 
 /**

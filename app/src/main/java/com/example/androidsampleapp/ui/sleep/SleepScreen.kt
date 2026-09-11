@@ -184,10 +184,15 @@ private const val HINT_FOLLOW_RATIO = 0.3f
 private const val HINT_MIN_ALPHA = 0.35f
 
 private val previewNotices = listOf(
-    Notice("1", NoticeCategory.CALL, "玄関からの呼び出しに応答がありませんでした", NoticeDestination.TOP),
-    Notice("2", NoticeCategory.ALERT, "フィルターの清掃時期です", NoticeDestination.AIRCON),
-    Notice("3", NoticeCategory.AIRCON, "リビングの設定温度を 26.0 度に変更しました", NoticeDestination.AIRCON),
-    Notice("4", NoticeCategory.INFO, "システムを起動しました", NoticeDestination.TOP),
+    Notice(
+        "1",
+        NoticeCategory.CALL,
+        "玄関からの呼び出しに応答がありませんでした",
+        NoticeDestination.Contact(hasMissedCall = true),
+    ),
+    Notice("2", NoticeCategory.ALERT, "フィルターの清掃時期です", NoticeDestination.Aircon),
+    Notice("3", NoticeCategory.AIRCON, "リビングの設定温度を 26.0 度に変更しました", NoticeDestination.Aircon),
+    Notice("4", NoticeCategory.INFO, "システムを起動しました", NoticeDestination.Top),
 )
 
 @PanelPreview

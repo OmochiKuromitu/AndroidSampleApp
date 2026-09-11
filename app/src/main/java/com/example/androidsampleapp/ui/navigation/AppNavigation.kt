@@ -14,14 +14,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.androidsampleapp.ui.aircon.AirconRoute
 import com.example.androidsampleapp.ui.common.Route
+import com.example.androidsampleapp.ui.contact.ContactRoute
 import com.example.androidsampleapp.ui.main.MainRoute
 import com.example.androidsampleapp.ui.main.MainTab
-import com.example.androidsampleapp.ui.main.toMainTab
+import com.example.androidsampleapp.ui.main.toRoute
 import com.example.androidsampleapp.ui.sleep.SleepRoute
 import com.example.androidsampleapp.ui.top.TopRoute
 
@@ -103,11 +106,32 @@ fun AppNavigation(
                 }
             }
 
+            composable(
+                route = Route.CONTACT_PATTERN,
+                arguments = listOf(
+                    navArgument(Route.ARG_CONTACT_LIST) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
+                MainRoute(
+                    selectedTab = MainTab.fromRoute(Route.CONTACT),
+                    onTabClick = onTabClick,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    ContactRoute()
+                }
+            }
+
             composable(Route.SLEEP) {
                 SleepRoute(
                     onUnlock = { idleTimer.wake() },
                     onNoticeSelected = { destination ->
-                        navController.navigateToTab(destination.toMainTab())
+                        // 引数つきで開きたいので、タブではなくルートを組み立てて渡す。
+                        // 状態を復元すると前回の引数のまま開いてしまうため、復元はしない。
+                        navController.navigateToRoute(destination.toRoute(), restore = false)
                         idleTimer.wake()
                     },
                 )
@@ -117,10 +141,18 @@ fun AppNavigation(
 }
 
 /** タブ切り替えの定型。タブごとのバックスタックを保存・復元する。 */
-private fun NavHostController.navigateToTab(tab: MainTab) {
-    navigate(tab.route) {
+private fun NavHostController.navigateToTab(tab: MainTab) = navigateToRoute(tab.route)
+
+/**
+ * 遷移の定型。タブごとのバックスタックを保存し、既定では復元して戻る。
+ *
+ * 引数つきのルートへ飛ぶときは [restore] を false にする。復元すると保存済みの
+ * エントリがそのまま戻り、新しく渡した引数が無視されるため。
+ */
+private fun NavHostController.navigateToRoute(route: String, restore: Boolean = true) {
+    navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
-        restoreState = true
+        restoreState = restore
     }
 }
