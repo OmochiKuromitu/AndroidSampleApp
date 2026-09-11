@@ -17,6 +17,7 @@ class IdleTimerTest {
         deviceHost = "127.0.0.1",
         tcpPort = 50100,
         udpPort = 50101,
+        apiBaseUrl = "http://127.0.0.1:8080/api",
         useFakeDevice = true,
         sleepTimeout = 30.seconds,
     )
