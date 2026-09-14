@@ -2,6 +2,11 @@ package com.example.androidsampleapp.ui.sleep
 
 import com.example.androidsampleapp.core.mvi.Reducer
 
+/**
+ * スリープ画面の (状態, Intent) -> 次の状態。
+ *
+ * 純粋関数に保つ。時刻の取得、通知の取得、解除の判定に応じた Effect は SleepViewModel が行う。
+ */
 class SleepReducer : Reducer<SleepState, SleepIntent> {
     override fun reduce(state: SleepState, intent: SleepIntent): SleepState = when (intent) {
         // 消去も取り直しを伴うので、取得と同じく読み込み中にする。

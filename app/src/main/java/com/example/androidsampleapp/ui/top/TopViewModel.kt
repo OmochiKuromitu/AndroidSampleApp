@@ -11,6 +11,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+/**
+ * トップ画面の ViewModel。
+ *
+ * - 着信とエアコンの状態を購読し、Intent にして Reducer に流す。
+ * - 応答・拒否の Intent を受けたら、[handle] で UseCase を通してコマンドを送り、
+ *   結果を Intent で戻してスナックバーを Effect で出す。
+ */
 @HiltViewModel
 class TopViewModel @Inject constructor(
     observeIncomingCall: ObserveIncomingCallUseCase,

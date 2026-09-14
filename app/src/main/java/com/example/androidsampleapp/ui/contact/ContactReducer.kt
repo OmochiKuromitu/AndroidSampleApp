@@ -2,6 +2,11 @@ package com.example.androidsampleapp.ui.contact
 
 import com.example.androidsampleapp.core.mvi.Reducer
 
+/**
+ * 連絡先画面の (状態, Intent) -> 次の状態。
+ *
+ * 純粋関数に保つ。取得と既読の呼び出しは ContactViewModel.handle が行う。
+ */
 class ContactReducer : Reducer<ContactState, ContactIntent> {
     override fun reduce(state: ContactState, intent: ContactIntent): ContactState = when (intent) {
         ContactIntent.Started -> state.copy(isLoading = true, loadFailed = false)
