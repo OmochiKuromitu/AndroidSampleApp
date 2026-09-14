@@ -43,12 +43,15 @@ import com.example.androidsampleapp.ui.theme.dimensions
  * 拭き掃除や誤接触で操作画面に戻らない。
  * ただし通知をタップした場合は、意図した操作とみなして復帰と遷移をまとめて行う。
  *
- * State を描き、操作を Intent として返すだけ。入口は [SleepRoute]。
+ * State を描き、操作をコールバックで返すだけ。Intent は知らない。入口は [SleepRoute]。
  */
 @Composable
 fun SleepScreen(
     state: SleepState,
-    onIntent: (SleepIntent) -> Unit,
+    onNoticeClick: (Notice) -> Unit,
+    onClearNoticesClick: () -> Unit,
+    onUnlockDrag: (Float) -> Unit,
+    onUnlockCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dimensions = MaterialTheme.dimensions
@@ -98,8 +101,8 @@ fun SleepScreen(
 
                     else -> NoticeList(
                         notices = state.notices,
-                        onNoticeClick = { onIntent(SleepIntent.NoticeClicked(it)) },
-                        onClearClick = { onIntent(SleepIntent.ClearNoticesClicked) },
+                        onNoticeClick = onNoticeClick,
+                        onClearClick = onClearNoticesClick,
                         contentColor = Color.White,
                     )
                 }
@@ -108,8 +111,8 @@ fun SleepScreen(
 
         UnlockArea(
             progress = state.unlockProgress,
-            onProgress = { onIntent(SleepIntent.UnlockDragged(it)) },
-            onCancel = { onIntent(SleepIntent.UnlockCancelled) },
+            onProgress = onUnlockDrag,
+            onCancel = onUnlockCancel,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
@@ -183,16 +186,30 @@ private fun UnlockHint(progress: Float, travel: Dp) {
 private const val HINT_FOLLOW_RATIO = 0.3f
 private const val HINT_MIN_ALPHA = 0.35f
 
+/** プレビューの時刻を固定するための基準（2026-09-11 15:00 JST）。 */
+private const val PREVIEW_NOW = 1_789_106_400_000L
+private const val PREVIEW_HOUR = 60 * 60 * 1000L
+
 private val previewNotices = listOf(
     Notice(
         "1",
         NoticeCategory.CALL,
+        "不在着信",
         "玄関からの呼び出しに応答がありませんでした",
+        PREVIEW_NOW - 1 * PREVIEW_HOUR,
         NoticeDestination.Contact(hasMissedCall = true),
     ),
-    Notice("2", NoticeCategory.ALERT, "フィルターの清掃時期です", NoticeDestination.Aircon),
-    Notice("3", NoticeCategory.AIRCON, "リビングの設定温度を 26.0 度に変更しました", NoticeDestination.Aircon),
-    Notice("4", NoticeCategory.INFO, "システムを起動しました", NoticeDestination.Top),
+    Notice("2", NoticeCategory.ALERT, "フィルター", "フィルターの清掃時期です", PREVIEW_NOW - 3 * PREVIEW_HOUR, NoticeDestination.Aircon),
+    Notice("3", NoticeCategory.AIRCON, "リビング", "設定温度を 26.0 度に変更しました", PREVIEW_NOW - 12 * PREVIEW_HOUR, NoticeDestination.Aircon),
+    Notice(
+        "4",
+        NoticeCategory.ALERT,
+        "故障情報：0402",
+        "室外機の通信が途絶えています\n点検を依頼してください",
+        PREVIEW_NOW - 20 * PREVIEW_HOUR,
+        NoticeDestination.Aircon,
+    ),
+    Notice("5", NoticeCategory.INFO, null, "システムを起動しました", PREVIEW_NOW - 30 * PREVIEW_HOUR, NoticeDestination.Top),
 )
 
 @PanelPreview
@@ -203,9 +220,12 @@ private fun SleepScreenPreview() {
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
-                notices = previewNotices,
+                apiNotices = previewNotices,
             ),
-            onIntent = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
         )
     }
 }
@@ -216,7 +236,10 @@ private fun SleepScreenEmptyPreview() {
     PreviewSurface {
         SleepScreen(
             state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
-            onIntent = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
         )
     }
 }
@@ -231,7 +254,10 @@ private fun SleepScreenLoadFailedPreview() {
                 dateText = "9月10日 (水)",
                 noticeLoadFailed = true,
             ),
-            onIntent = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
         )
     }
 }
@@ -244,10 +270,13 @@ private fun SleepScreenSwipingPreview() {
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
-                notices = previewNotices,
+                apiNotices = previewNotices,
                 unlockProgress = 0.7f,
             ),
-            onIntent = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
         )
     }
 }

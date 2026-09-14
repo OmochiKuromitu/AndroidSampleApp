@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  *
  * 最初に開くリストは遷移時の引数で決まる。引数は ViewModel が
  * [androidx.lifecycle.SavedStateHandle] から受け取るので、ここでは何もしない。
+ * [ContactScreen] には State と操作のコールバックだけを渡し、Intent に変えるのはここで行う。
  */
 @Composable
 fun ContactRoute(
@@ -19,5 +20,9 @@ fun ContactRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    ContactScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    ContactScreen(
+        state = state,
+        onListSelect = { viewModel.dispatch(ContactIntent.ListSelected(it)) },
+        modifier = modifier,
+    )
 }

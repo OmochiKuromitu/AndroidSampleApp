@@ -47,7 +47,7 @@ import com.example.androidsampleapp.ui.theme.dimensions
 @Composable
 fun ContactScreen(
     state: ContactState,
-    onIntent: (ContactIntent) -> Unit,
+    onListSelect: (ContactList) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -56,7 +56,7 @@ fun ContactScreen(
                 val badgeCount = if (list == ContactList.HISTORY) state.missedCallCount else 0
                 Tab(
                     selected = list == state.selectedList,
-                    onClick = { onIntent(ContactIntent.ListSelected(list)) },
+                    onClick = { onListSelect(list) },
                     text = {
                         BadgedBox(
                             badge = { if (badgeCount > 0) Badge { Text(badgeCount.toString()) } },
@@ -163,7 +163,7 @@ private fun ContactScreenPhonebookPreview() {
                 histories = previewHistories,
                 missedCallCount = 2,
             ),
-            onIntent = {},
+            onListSelect = {},
         )
     }
 }
@@ -179,7 +179,7 @@ private fun ContactScreenHistoryPreview() {
                 histories = previewHistories,
                 missedCallCount = 2,
             ),
-            onIntent = {},
+            onListSelect = {},
         )
     }
 }
@@ -188,6 +188,6 @@ private fun ContactScreenHistoryPreview() {
 @Composable
 private fun ContactScreenLoadFailedPreview() {
     PreviewSurface {
-        ContactScreen(state = ContactState(loadFailed = true), onIntent = {})
+        ContactScreen(state = ContactState(loadFailed = true), onListSelect = {})
     }
 }

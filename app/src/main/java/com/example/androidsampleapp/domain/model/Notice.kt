@@ -1,7 +1,7 @@
 package com.example.androidsampleapp.domain.model
 
 /**
- * 機器から受け取った通知。
+ * 一覧に出す通知。HTTP の API から取るものと、機器から TCP で届くものの 2 つの出どころがある。
  *
  * どの画面へ飛ぶかを通知自身が持つ。一覧側に「この分類ならここ」という
  * 対応表を書かずに済み、飛び先を増やすときも [NoticeDestination] だけで閉じる。
@@ -9,7 +9,15 @@ package com.example.androidsampleapp.domain.model
 data class Notice(
     val id: String,
     val category: NoticeCategory,
+    /** 種別の横に出す短い見出し。無い通知もある。 */
+    val title: String?,
+    /** 見出しの下に出す詳細。 */
     val message: String,
+    /**
+     * 起きた日時（epoch ミリ秒）。出どころの違う通知を混ぜて並べるので、表示用の文字列ではなく
+     * 比べられる値で持つ。整形は ui 層で行う。
+     */
+    val occurredAt: Long,
     val destination: NoticeDestination,
 )
 

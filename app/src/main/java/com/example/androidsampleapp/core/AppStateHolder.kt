@@ -3,6 +3,7 @@ package com.example.androidsampleapp.core
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
+import com.example.androidsampleapp.domain.model.Notice
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,10 @@ class AppStateHolder @Inject constructor() {
     private val _aircon = MutableStateFlow(Aircon())
     val aircon: StateFlow<Aircon> = _aircon.asStateFlow()
 
+    /** 機器から届いた通知。新しいものが先頭。何件まで持つかは書き手が決める。 */
+    private val _deviceNotices = MutableStateFlow<List<Notice>>(emptyList())
+    val deviceNotices: StateFlow<List<Notice>> = _deviceNotices.asStateFlow()
+
     fun updateConnectionState(state: ConnectionState) {
         _connectionState.value = state
     }
@@ -41,5 +46,9 @@ class AppStateHolder @Inject constructor() {
 
     fun updateAircon(transform: (Aircon) -> Aircon) {
         _aircon.update(transform)
+    }
+
+    fun updateDeviceNotices(transform: (List<Notice>) -> List<Notice>) {
+        _deviceNotices.update(transform)
     }
 }

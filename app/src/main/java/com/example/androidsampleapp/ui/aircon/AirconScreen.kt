@@ -29,14 +29,17 @@ import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
- * エアコン画面の表示。State を描き、操作を Intent として返すだけ。
+ * エアコン画面の表示。State を描き、操作をコールバックで返すだけ。Intent は知らない。
  *
  * 入口は [AirconRoute]。
  */
 @Composable
 fun AirconScreen(
     state: AirconState,
-    onIntent: (AirconIntent) -> Unit,
+    onPowerToggle: (Boolean) -> Unit,
+    onTemperatureDownClick: () -> Unit,
+    onTemperatureUpClick: () -> Unit,
+    onModeSelect: (AirconMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -61,7 +64,7 @@ fun AirconScreen(
             Text(stringResource(R.string.aircon_power), style = MaterialTheme.typography.titleLarge)
             Switch(
                 checked = state.aircon.isOn,
-                onCheckedChange = { onIntent(AirconIntent.PowerToggled(it)) },
+                onCheckedChange = onPowerToggle,
                 enabled = state.isOperable,
             )
         }
@@ -74,8 +77,8 @@ fun AirconScreen(
         TemperatureControl(
             targetTemperature = state.aircon.targetTemperature,
             enabled = state.isOperable && state.aircon.isOn,
-            onDown = { onIntent(AirconIntent.TemperatureDownClicked) },
-            onUp = { onIntent(AirconIntent.TemperatureUpClicked) },
+            onDown = onTemperatureDownClick,
+            onUp = onTemperatureUpClick,
         )
 
         Text(stringResource(R.string.aircon_mode), style = MaterialTheme.typography.titleLarge)
@@ -83,7 +86,7 @@ fun AirconScreen(
             AirconMode.entries.forEach { mode ->
                 FilterChip(
                     selected = mode == state.aircon.mode,
-                    onClick = { onIntent(AirconIntent.ModeSelected(mode)) },
+                    onClick = { onModeSelect(mode) },
                     enabled = state.isOperable && state.aircon.isOn,
                     label = { Text(mode.label) },
                 )
@@ -147,7 +150,10 @@ private fun AirconScreenRunningPreview() {
                 ),
                 connectionState = ConnectionState.CONNECTED,
             ),
-            onIntent = {},
+            onPowerToggle = {},
+            onTemperatureDownClick = {},
+            onTemperatureUpClick = {},
+            onModeSelect = {},
         )
     }
 }
@@ -161,7 +167,10 @@ private fun AirconScreenStoppedPreview() {
                 aircon = Aircon(isOn = false, roomTemperature = 22.0),
                 connectionState = ConnectionState.CONNECTED,
             ),
-            onIntent = {},
+            onPowerToggle = {},
+            onTemperatureDownClick = {},
+            onTemperatureUpClick = {},
+            onModeSelect = {},
         )
     }
 }
@@ -172,7 +181,10 @@ private fun AirconScreenOfflinePreview() {
     PreviewSurface {
         AirconScreen(
             state = AirconState(connectionState = ConnectionState.DISCONNECTED),
-            onIntent = {},
+            onPowerToggle = {},
+            onTemperatureDownClick = {},
+            onTemperatureUpClick = {},
+            onModeSelect = {},
         )
     }
 }

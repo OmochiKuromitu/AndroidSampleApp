@@ -10,13 +10,15 @@ class SleepReducer : Reducer<SleepState, SleepIntent> {
         -> state.copy(isLoadingNotices = true, noticeLoadFailed = false)
 
         is SleepIntent.NoticesLoaded -> state.copy(
-            notices = intent.notices,
+            apiNotices = intent.notices,
             isLoadingNotices = false,
             noticeLoadFailed = false,
         )
 
         SleepIntent.NoticesLoadFailed ->
             state.copy(isLoadingNotices = false, noticeLoadFailed = true)
+
+        is SleepIntent.DeviceNoticesChanged -> state.copy(deviceNotices = intent.notices)
 
         is SleepIntent.Ticked -> state.copy(timeText = intent.timeText, dateText = intent.dateText)
 

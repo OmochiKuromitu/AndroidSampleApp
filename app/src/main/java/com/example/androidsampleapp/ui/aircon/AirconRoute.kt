@@ -13,7 +13,7 @@ import com.example.androidsampleapp.core.mvi.CollectEffect
  * エアコン画面の配線。ここが AppNavigation から呼ばれる入口になる。
  *
  * ViewModel の取得、State の購読、Effect の受け取りを担い、[AirconScreen] には
- * State と Intent の受け口だけを渡す。
+ * State と操作のコールバックだけを渡す。操作を Intent に変えるのはここ。
  */
 @Composable
 fun AirconRoute(
@@ -31,5 +31,12 @@ fun AirconRoute(
         }
     }
 
-    AirconScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    AirconScreen(
+        state = state,
+        onPowerToggle = { viewModel.dispatch(AirconIntent.PowerToggled(it)) },
+        onTemperatureDownClick = { viewModel.dispatch(AirconIntent.TemperatureDownClicked) },
+        onTemperatureUpClick = { viewModel.dispatch(AirconIntent.TemperatureUpClicked) },
+        onModeSelect = { viewModel.dispatch(AirconIntent.ModeSelected(it)) },
+        modifier = modifier,
+    )
 }

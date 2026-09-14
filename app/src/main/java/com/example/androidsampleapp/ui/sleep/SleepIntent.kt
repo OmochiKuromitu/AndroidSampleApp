@@ -13,6 +13,9 @@ sealed interface SleepIntent : UiIntent {
     data class NoticesLoaded(val notices: List<Notice>) : SleepIntent
     data object NoticesLoadFailed : SleepIntent
 
+    /** 機器から届いた通知の変化。スリープ中でも届くたびに流れる。 */
+    data class DeviceNoticesChanged(val notices: List<Notice>) : SleepIntent
+
     data object ClearNoticesClicked : SleepIntent
     data class NoticeClicked(val notice: Notice) : SleepIntent
 

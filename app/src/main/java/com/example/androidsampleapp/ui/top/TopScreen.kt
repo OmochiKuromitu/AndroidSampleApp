@@ -24,15 +24,16 @@ import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
- * トップ画面の表示。State を描き、操作を Intent として返すだけ。
- * ViewModel も Effect も知らないので、そのままプレビューできる。
+ * トップ画面の表示。State を描き、操作をコールバックで返すだけ。
+ * ViewModel も Intent も Effect も知らないので、そのままプレビューできる。
  *
  * 入口は [TopRoute]。
  */
 @Composable
 fun TopScreen(
     state: TopState,
-    onIntent: (TopIntent) -> Unit,
+    onAnswerClick: () -> Unit,
+    onRejectClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -46,8 +47,8 @@ fun TopScreen(
             IncomingCallCard(
                 call = call,
                 enabled = !state.isSendingCommand,
-                onAnswer = { onIntent(TopIntent.AnswerClicked) },
-                onReject = { onIntent(TopIntent.RejectClicked) },
+                onAnswer = onAnswerClick,
+                onReject = onRejectClick,
             )
         }
 
@@ -143,7 +144,8 @@ private fun TopScreenIdlePreview() {
                     roomTemperature = 28.4,
                 ),
             ),
-            onIntent = {},
+            onAnswerClick = {},
+            onRejectClick = {},
         )
     }
 }
@@ -157,7 +159,8 @@ private fun TopScreenIncomingCallPreview() {
                 incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
                 aircon = Aircon(isOn = false, roomTemperature = 24.1),
             ),
-            onIntent = {},
+            onAnswerClick = {},
+            onRejectClick = {},
         )
     }
 }
@@ -171,7 +174,8 @@ private fun TopScreenSendingPreview() {
                 incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
                 isSendingCommand = true,
             ),
-            onIntent = {},
+            onAnswerClick = {},
+            onRejectClick = {},
         )
     }
 }

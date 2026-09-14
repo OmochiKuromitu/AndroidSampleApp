@@ -13,8 +13,11 @@ class SleepReducerTest {
     private val reducer = SleepReducer()
 
     private val notices = listOf(
-        Notice("1", NoticeCategory.CALL, "玄関から呼び出し", NoticeDestination.Top),
+        notice(id = "1", occurredAt = 100L),
     )
+
+    private fun notice(id: String, occurredAt: Long) =
+        Notice(id, NoticeCategory.CALL, null, "玄関から呼び出し", occurredAt, NoticeDestination.Top)
 
     @Test
     fun `Started で通知の取得中になる`() {
@@ -46,12 +49,53 @@ class SleepReducerTest {
     @Test
     fun `消去後の空の一覧も同じ経路で入る`() {
         val next = reducer.reduce(
-            SleepState(notices = notices, isLoadingNotices = true),
+            SleepState(apiNotices = notices, isLoadingNotices = true),
             SleepIntent.NoticesLoaded(emptyList()),
         )
 
         assertTrue(next.notices.isEmpty())
         assertFalse(next.isLoadingNotices)
+    }
+
+    @Test
+    fun `機器からの通知が入る`() {
+        val device = listOf(notice(id = "device-1", occurredAt = 200L))
+
+        val next = reducer.reduce(SleepState(), SleepIntent.DeviceNoticesChanged(device))
+
+        assertEquals(device, next.notices)
+    }
+
+    @Test
+    fun `API を取り直しても機器からの通知は残る`() {
+        val device = listOf(notice(id = "device-1", occurredAt = 200L))
+
+        val next = reducer.reduce(
+            SleepState(deviceNotices = device, isLoadingNotices = true),
+            SleepIntent.NoticesLoaded(emptyList()),
+        )
+
+        assertEquals(device, next.notices)
+    }
+
+    @Test
+    fun `機器からの通知が変わっても API の一覧は残る`() {
+        val next = reducer.reduce(
+            SleepState(apiNotices = notices),
+            SleepIntent.DeviceNoticesChanged(emptyList()),
+        )
+
+        assertEquals(notices, next.notices)
+    }
+
+    @Test
+    fun `出どころの違う通知は新しい順に混ざる`() {
+        val state = SleepState(
+            apiNotices = listOf(notice("api-new", 300L), notice("api-old", 100L)),
+            deviceNotices = listOf(notice("device-mid", 200L)),
+        )
+
+        assertEquals(listOf("api-new", "device-mid", "api-old"), state.notices.map { it.id })
     }
 
     @Test
@@ -67,7 +111,7 @@ class SleepReducerTest {
 
     @Test
     fun `通知のタップは状態を変えない`() {
-        val state = SleepState(notices = notices)
+        val state = SleepState(apiNotices = notices)
 
         val next = reducer.reduce(state, SleepIntent.NoticeClicked(notices.first()))
 

@@ -12,7 +12,7 @@ import com.example.androidsampleapp.domain.model.NoticeDestination
  * スリープ画面の配線。ここが AppNavigation から呼ばれる入口になる。
  *
  * Effect を受けて [onUnlock] / [onNoticeSelected] に流すだけで、遷移そのものは
- * AppNavigation が行う。[SleepScreen] は State を描くだけに保つ。
+ * AppNavigation が行う。[SleepScreen] は State を描くだけに保ち、操作を Intent に変えるのはここ。
  */
 @Composable
 fun SleepRoute(
@@ -30,5 +30,12 @@ fun SleepRoute(
         }
     }
 
-    SleepScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    SleepScreen(
+        state = state,
+        onNoticeClick = { viewModel.dispatch(SleepIntent.NoticeClicked(it)) },
+        onClearNoticesClick = { viewModel.dispatch(SleepIntent.ClearNoticesClicked) },
+        onUnlockDrag = { viewModel.dispatch(SleepIntent.UnlockDragged(it)) },
+        onUnlockCancel = { viewModel.dispatch(SleepIntent.UnlockCancelled) },
+        modifier = modifier,
+    )
 }

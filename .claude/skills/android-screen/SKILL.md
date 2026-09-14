@@ -13,7 +13,8 @@ description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付け�
 
 1. **遷移を書くのは `ui/navigation/AppNavigation.kt` だけ。** `NavController` を持つのもここだけ。
    画面や ViewModel から `navigate` を呼ばない。
-2. **`XxxScreen` は表示だけ。** ViewModel も Effect も知らない。配線は `XxxRoute`。
+2. **`XxxScreen` は表示だけ。** ViewModel も Intent も Effect も知らない。配線は `XxxRoute`。
+   Screen は操作ごとのコールバックを受け取り、それを Intent に変えて `dispatch` するのは Route。
 3. **Reducer は純粋関数。** I/O・時刻取得・コルーチン起動を書かない。副作用は ViewModel の `handle()`。
 4. **状態が変わる入口は Reducer だけ。** 通信結果も共有状態の変化も Intent に変換して通す。
 
@@ -29,7 +30,7 @@ description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付け�
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
 | `XxxViewModel.kt` | `MviViewModel` を継承。`@HiltViewModel` |
 | `XxxRoute.kt` | 配線。ViewModel 取得、State 購読、Effect 受け取り、`LaunchedEffect` |
-| `XxxScreen.kt` | 表示。`state` と `onIntent` だけを受け取る。プレビューもここ |
+| `XxxScreen.kt` | 表示。`state` と操作ごとのコールバックだけを受け取る。プレビューもここ |
 
 ### 骨組み
 
@@ -116,14 +117,19 @@ fun XxxRoute(
         }
     }
 
-    XxxScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    // 操作を Intent に変えるのは Route。Screen に Intent を渡さない
+    XxxScreen(
+        state = state,
+        onItemClick = { viewModel.dispatch(XxxIntent.ItemClicked(it)) },
+        modifier = modifier,
+    )
 }
 
-// XxxScreen.kt — 表示だけ。ViewModel も Effect も知らない
+// XxxScreen.kt — 表示だけ。ViewModel も Intent も Effect も知らない
 @Composable
 fun XxxScreen(
     state: XxxState,
-    onIntent: (XxxIntent) -> Unit,
+    onItemClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) { /* ... */ }
 
@@ -131,7 +137,7 @@ fun XxxScreen(
 @Composable
 private fun XxxScreenPreview() {
     PreviewSurface {
-        XxxScreen(state = XxxState(/* 見たい状態 */), onIntent = {})
+        XxxScreen(state = XxxState(/* 見たい状態 */), onItemClick = {})
     }
 }
 ```
@@ -203,7 +209,7 @@ data class NavigateToAircon(...) : SleepEffect
 | 置き場所 | 何を置くか | 書き手 |
 | --- | --- | --- |
 | `XxxState` | 画面固有（送信中フラグ、入力中の値、表示の進み具合） | その画面の Reducer |
-| `core/AppStateHolder` | 機器から TCP で降ってくる状態（接続、着信、エアコン） | `data/DeviceRepositoryImpl` だけ |
+| `core/AppStateHolder` | 機器から TCP で降ってくる状態（接続、着信、エアコン、機器からの通知） | `data/DeviceRepositoryImpl` だけ |
 | 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数） | そのクラス自身 |
 
 **読み手が 1 画面なら共有の器を作らない。** その画面の `XxxState` に持たせる。
@@ -223,6 +229,9 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
 ## データを足す
 
 機器（TCP/UDP）と API（HTTP）で経路が違う。混ぜない。
+画面で 1 つの一覧に合わせたいときも、取り込みまでは別々に通し、画面の `XxxState` に
+出どころ別に持たせて合わせる（見本は `SleepState` の `apiNotices` / `deviceNotices` / `notices`）。
+並べ替えるなら時刻は比べられる値（epoch ミリ秒）で持ち、一覧の key が出どころ間で重ならないようにする。
 
 - **機器から来る** — `network/MessageParser` に解釈を足し、`model/DeviceMessage` に型を足し、
   `data/DeviceRepositoryImpl` が `AppStateHolder` に反映する。

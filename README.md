@@ -77,14 +77,16 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
 | `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
 | `XxxRoute.kt` | 配線。ViewModel の取得、State の購読、Effect の受け取り、`LaunchedEffect` |
-| `XxxScreen.kt` | 表示。State を描き、操作を Intent として返すだけ |
+| `XxxScreen.kt` | 表示。State を描き、操作をコールバックで返すだけ。Intent は知らない |
 
 **Route と Screen を分ける。**
 
 - `XxxRoute` — `AppNavigation` から呼ばれる入口。`hiltViewModel()` で ViewModel を取り、
   State を購読し、Effect を受けて呼び出し元のコールバックへ流す。`LaunchedEffect` もここ。
-- `XxxScreen` — `state` と `onIntent: (Intent) -> Unit` だけを受け取る。
-  ViewModel も Effect も知らない。
+  Screen から返ってきた操作を Intent に変えて `dispatch` するのもここだけ。
+- `XxxScreen` — `state` と、操作ごとのコールバック（`onAnswerClick: () -> Unit`、
+  `onModeSelect: (AirconMode) -> Unit` など）だけを受け取る。
+  ViewModel も Intent も Effect も知らない。
 
 Screen を表示だけに保つのが目的。副作用の配線が混ざると、見た目を直すつもりで
 ライフサイクルの都合を読む羽目になる。プレビューの都合もある。`hiltViewModel()` は
@@ -98,7 +100,10 @@ private fun AirconScreenOfflinePreview() {
     PreviewSurface {
         AirconScreen(
             state = AirconState(connectionState = ConnectionState.DISCONNECTED),
-            onIntent = {},
+            onPowerToggle = {},
+            onTemperatureDownClick = {},
+            onTemperatureUpClick = {},
+            onModeSelect = {},
         )
     }
 }
@@ -191,7 +196,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 
 ### 共有状態 — AppStateHolder
 
-接続状態・着信・エアコンの現在値は、全画面が見る。これを `core/AppStateHolder` が単独で持つ。
+接続状態・着信・エアコンの現在値と、機器から届いた通知は、`core/AppStateHolder` が単独で持つ。
 
 - **書き込むのは 1 か所だけ** — 受信を反映する `data/DeviceRepositoryImpl`。
 - 画面と ViewModel は読むだけ。UseCase 経由で `StateFlow` を受け取り、
@@ -278,15 +283,42 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 
 時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
 
-通知は **HTTP の API** から取る。機器との TCP とは経路が別なので、
-`AppStateHolder`（機器から降ってくる状態）は通らない。リポジトリも状態を持たず、
-保持するのは `SleepState` だけ。
+1 件ずつ白いカードで出し、1 行目に「種別・タイトル・時刻」、2 行目に詳細を置く。
+**警報（`ALERT`）は上にまとめ、それ以外との間に線を引く。** 並べ替えは表示の都合なので
+`ui/common/NoticeList` で行い、グループの中はサーバから来た順（新しいものが先頭）のまま。
+
+通知の出どころは 2 つある。
+
+| 出どころ | 経路 | 持ち主 | 画面への届き方 |
+| --- | --- | --- | --- |
+| HTTP の API | `NoticeRepository` | `SleepState.apiNotices`（リポジトリは持たない） | 取りに行った結果を `NoticesLoaded` で |
+| 機器（TCP の `NOTICE` 行） | `DeviceRepositoryImpl` → `AppStateHolder` | `AppStateHolder.deviceNotices` | 購読して、届くたびに `DeviceNoticesChanged` で |
+
+```
+SleepViewModel.init
+  └─ ObserveDeviceNoticesUseCase().collect { dispatch(DeviceNoticesChanged(it)) }
+
+SleepState
+  apiNotices ─┐
+              ├─▶ notices（新しい順に合わせたもの。一覧に出すのはこれ）
+  deviceNotices ┘
+```
+
+出どころ別に持つのは、API を取り直したときに機器からの分を消さないため（逆も同じ）。
+合わせて並べるので、`Notice.occurredAt` は表示用の文字列ではなく epoch ミリ秒で持ち、
+整形は `NoticeList` で行う（minSdk 24 なので `java.time` は使わない）。
+
+機器からの通知は仮置き。形式は `NOTICE|種別|タイトル|詳細|飛び先`（タイトルは空でよい）で、
+機器は id も時刻も送ってこない前提にしている。受け取った時刻を入れ、id には `device-` を付けて
+API の通知と一覧の key が重ならないようにしている。新しいものを先頭に 20 件まで持つ。
+mock flavor では `fakeEvents()` が起動直後に 1 件、以降 20 秒ごとに 1 件流す。
 
 API は取得と消去の 2 本。UseCase もそれに 1 対 1 で対応する。
 
 ```
 SleepIntent.Started          ─▶ GetNoticesUseCase   ─▶ GET    /notices
 SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notices
+                                                        ├▶ 機器からの通知を手元から消す
                                                         └▶ GET /notices（取り直し）
                                     どちらも結果は SleepIntent.NoticesLoaded として戻る
 ```
@@ -308,7 +340,9 @@ SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notice
 data class Notice(
     val id: String,
     val category: NoticeCategory,   // CALL / AIRCON / ALERT / INFO。一覧ではタグとして色分け
-    val message: String,
+    val title: String?,             // 種別の横に出す見出し。無い通知もある
+    val message: String,            // 見出しの下に出す詳細
+    val occurredAt: Long,           // epoch ミリ秒。整形は ui 層
     val destination: NoticeDestination,   // TOP / AIRCON
 )
 ```
@@ -377,7 +411,7 @@ MonitoringService (前面サービス)
   └─ DeviceRepository.monitor()          再接続ループ。切れたら待って繋ぎ直す
        └─ TcpClient.connect(): Flow      1 行 = 1 メッセージ
             └─ MessageParser.parse()     文字列 -> DeviceMessage
-                 └─ AppStateHolder       接続状態・着信・エアコンを更新
+                 └─ AppStateHolder       接続状態・着信・エアコン・機器からの通知を更新
 
 操作: ViewModel -> UseCase -> Repository -> UdpCommandClient.send(CommandRequest)
       結果は TCP 側の通知で返ってくるので、送信時に楽観的な更新はしない

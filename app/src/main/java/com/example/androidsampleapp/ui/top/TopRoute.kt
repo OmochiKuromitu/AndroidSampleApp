@@ -13,7 +13,8 @@ import com.example.androidsampleapp.core.mvi.CollectEffect
  * トップ画面の配線。ここが AppNavigation から呼ばれる入口になる。
  *
  * ViewModel の取得、State の購読、Effect の受け取りを担い、[TopScreen] には
- * State と Intent の受け口だけを渡す。Screen を表示だけに保つための層。
+ * State と操作のコールバックだけを渡す。操作を Intent に変えるのもここで、
+ * Screen を表示だけに保つための層。
  */
 @Composable
 fun TopRoute(
@@ -31,5 +32,10 @@ fun TopRoute(
         }
     }
 
-    TopScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    TopScreen(
+        state = state,
+        onAnswerClick = { viewModel.dispatch(TopIntent.AnswerClicked) },
+        onRejectClick = { viewModel.dispatch(TopIntent.RejectClicked) },
+        modifier = modifier,
+    )
 }
