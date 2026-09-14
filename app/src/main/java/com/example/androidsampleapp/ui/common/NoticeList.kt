@@ -196,7 +196,7 @@ private fun NoticeTag(category: NoticeCategory) {
         modifier = Modifier.width(TAG_WIDTH),
     ) {
         Text(
-            text = category.label,
+            text = stringResource(category.labelRes()),
             style = MaterialTheme.typography.labelLarge,
             color = Color.White,
             textAlign = TextAlign.Center,

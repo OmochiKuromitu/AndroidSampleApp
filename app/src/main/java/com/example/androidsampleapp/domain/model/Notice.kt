@@ -23,13 +23,13 @@ data class Notice(
 
 /**
  * 通知の分類。一覧ではタグとして色分けして出す。
- * サーバや機器の文字列との対応は data 層（data/CodeMapping）が持つ。
+ * サーバや機器の文字列との対応は data 層（data/CodeMapping）が、表示名は ui 層（ui/common/Labels）が持つ。
  */
-enum class NoticeCategory(val label: String) {
-    CALL("来客"),
-    AIRCON("エアコン"),
-    ALERT("警報"),
-    INFO("お知らせ"),
+enum class NoticeCategory {
+    CALL,
+    AIRCON,
+    ALERT,
+    INFO,
 }
 
 /**

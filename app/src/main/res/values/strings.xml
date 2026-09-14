@@ -27,6 +27,10 @@
     <string name="aircon_mode">運転モード</string>
     <string name="aircon_off">停止中</string>
     <string name="aircon_offline">機器に接続できていません</string>
+    <string name="aircon_mode_cool">冷房</string>
+    <string name="aircon_mode_heat">暖房</string>
+    <string name="aircon_mode_dry">除湿</string>
+    <string name="aircon_mode_fan">送風</string>
 
     <string name="contact_phonebook">電話帳</string>
     <string name="contact_history">履歴</string>
@@ -40,6 +44,10 @@
     <string name="notice_clear">消去</string>
     <string name="notice_empty">通知はありません</string>
     <string name="notice_load_failed">通知を取得できませんでした</string>
+    <string name="notice_category_call">来客</string>
+    <string name="notice_category_aircon">エアコン</string>
+    <string name="notice_category_alert">警報</string>
+    <string name="notice_category_info">お知らせ</string>
 
     <string name="service_notification_channel">機器の監視</string>
     <string name="service_notification_title">機器を監視しています</string>

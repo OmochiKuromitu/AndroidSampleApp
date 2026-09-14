@@ -12,12 +12,12 @@ data class Aircon(
 )
 
 /**
- * 運転モード。機器とやり取りする文字列との対応は data 層（data/CodeMapping）が持ち、
- * ドメインは機器の言葉を知らない。
+ * 運転モード。機器とやり取りする文字列との対応は data 層（data/CodeMapping）が、
+ * 表示名は ui 層（ui/common/Labels）が持つ。ドメインは機器の言葉も画面の言葉も知らない。
  */
-enum class AirconMode(val label: String) {
-    COOL("冷房"),
-    HEAT("暖房"),
-    DRY("除湿"),
-    FAN("送風"),
+enum class AirconMode {
+    COOL,
+    HEAT,
+    DRY,
+    FAN,
 }
