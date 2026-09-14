@@ -12,6 +12,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/**
+ * スリープ画面の ViewModel。
+ *
+ * - 1 秒ごとに時刻を整形して Ticked を投げる。
+ * - 通知の一覧は NoticeManager を購読するだけで、自分では取りに行かない（きっかけは AppNavigation）。
+ *   消去を押されたら NoticeManager に頼む。
+ * - 解除スワイプが必要な距離に届いた瞬間と、通知がタップされたときに Effect を出す。
+ *   どこへ行くかは AppNavigation が決める。
+ */
 @HiltViewModel
 class SleepViewModel @Inject constructor(
     private val noticeManager: NoticeManager,

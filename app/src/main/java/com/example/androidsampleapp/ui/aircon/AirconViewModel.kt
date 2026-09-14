@@ -13,6 +13,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+/**
+ * エアコン画面の ViewModel。
+ *
+ * - 機器のエアコン状態と接続状態を購読し、Intent にして Reducer に流す。
+ * - 操作の Intent を受けたら、[handle] で UseCase を通してコマンドを送り、結果を Intent で戻す。
+ *   失敗したときはスナックバーを Effect で出す。
+ */
 @HiltViewModel
 class AirconViewModel @Inject constructor(
     observeAircon: ObserveAirconStateUseCase,

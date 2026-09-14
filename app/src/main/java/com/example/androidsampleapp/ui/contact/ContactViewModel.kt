@@ -12,6 +12,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
+/**
+ * 連絡先画面の ViewModel。
+ *
+ * - 最初に開くリストは遷移の引数（SavedStateHandle）から、初期状態の時点で決める。
+ * - 画面を開いたら電話帳と履歴をまとめて取る。
+ * - 不在着信の件数は MissedCallManager を購読するだけで、履歴を見せたら既読を頼む。
+ * - お知らせの一覧は NoticeManager を購読するだけで、消去を押されたら NoticeManager に頼む。
+ *   お知らせがタップされたら Effect を出し、どこへ行くかは AppNavigation が決める。
+ */
 @HiltViewModel
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
