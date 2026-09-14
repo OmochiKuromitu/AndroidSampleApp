@@ -238,6 +238,11 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
   `data/DeviceRepositoryImpl` が `AppStateHolder` に反映する。
 - **API から来る** — `model/` にレスポンス型、`data/` のリポジトリが自分で保持して
   `toDomain()` で変換。`AppStateHolder` は通さない。`data/NoticeRepositoryImpl` が見本。
+- **サーバや機器の文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
+  domain の `companion object` に `fromCode` を書かない。domain が通信の言葉を知ると、
+  形式が変わったときに domain まで直すことになる。送る向き（`AirconMode.toCode()`）も同じ場所。
+- **表示名（「冷房」「来客」など）は domain に持たせず、`ui/common/Labels` の `labelRes()` で
+  `@StringRes` に対応させる。** domain は通信の言葉も画面の言葉も知らない状態に保つ。
 - 機器へ送るコマンドは `model/CommandRequest` に 1 件足す。文字列化はその型が持つ。
 
 どちらの場合も `domain/repository/` に interface、`domain/usecase/` に UseCase、

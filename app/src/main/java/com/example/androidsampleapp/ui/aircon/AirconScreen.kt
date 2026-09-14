@@ -25,6 +25,7 @@ import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.ui.common.PanelPreview
+import com.example.androidsampleapp.ui.common.labelRes
 import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.dimensions
 
@@ -88,7 +89,7 @@ fun AirconScreen(
                     selected = mode == state.aircon.mode,
                     onClick = { onModeSelect(mode) },
                     enabled = state.isOperable && state.aircon.isOn,
-                    label = { Text(mode.label) },
+                    label = { Text(stringResource(mode.labelRes())) },
                 )
             }
         }

@@ -21,6 +21,7 @@ import com.example.androidsampleapp.ui.common.CenteredMessage
 import com.example.androidsampleapp.ui.common.PanelButton
 import com.example.androidsampleapp.ui.common.PanelPreview
 import com.example.androidsampleapp.ui.common.PreviewSurface
+import com.example.androidsampleapp.ui.common.labelRes
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
@@ -121,7 +122,7 @@ private fun AirconSummaryCard(aircon: Aircon) {
             Text(
                 text = if (aircon.isOn) {
                     stringResource(R.string.aircon_target_temperature, aircon.targetTemperature) +
-                        "（${aircon.mode.label}）"
+                        "（${stringResource(aircon.mode.labelRes())}）"
                 } else {
                     stringResource(R.string.aircon_off)
                 },
