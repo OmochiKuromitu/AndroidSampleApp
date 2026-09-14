@@ -11,15 +11,13 @@ data class Aircon(
     val roomTemperature: Double = 26.0,
 )
 
-enum class AirconMode(val code: String, val label: String) {
-    COOL("COOL", "冷房"),
-    HEAT("HEAT", "暖房"),
-    DRY("DRY", "除湿"),
-    FAN("FAN", "送風"),
-    ;
-
-    companion object {
-        fun fromCode(code: String): AirconMode =
-            entries.firstOrNull { it.code == code } ?: COOL
-    }
+/**
+ * 運転モード。機器とやり取りする文字列との対応は data 層（data/CodeMapping）が持ち、
+ * ドメインは機器の言葉を知らない。
+ */
+enum class AirconMode(val label: String) {
+    COOL("冷房"),
+    HEAT("暖房"),
+    DRY("除湿"),
+    FAN("送風"),
 }

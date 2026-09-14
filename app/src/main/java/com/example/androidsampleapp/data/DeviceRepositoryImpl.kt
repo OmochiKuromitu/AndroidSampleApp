@@ -2,12 +2,9 @@ package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.core.AppStateHolder
-import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
 import com.example.androidsampleapp.domain.model.Notice
-import com.example.androidsampleapp.domain.model.NoticeCategory
-import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.domain.repository.DeviceRepository
 import com.example.androidsampleapp.model.CommandRequest
 import com.example.androidsampleapp.model.DeviceMessage
@@ -98,7 +95,7 @@ class DeviceRepositoryImpl @Inject constructor(
             is DeviceMessage.AirconStatus -> appStateHolder.updateAircon { current ->
                 current.copy(
                     isOn = message.isOn,
-                    mode = AirconMode.fromCode(message.mode),
+                    mode = airconModeOf(message.mode),
                     targetTemperature = message.targetTemperature,
                     roomTemperature = message.roomTemperature,
                 )
@@ -121,11 +118,11 @@ class DeviceRepositoryImpl @Inject constructor(
      */
     private fun DeviceMessage.NoticeReceived.toDomain(): Notice = Notice(
         id = DEVICE_NOTICE_ID_PREFIX + UUID.randomUUID(),
-        category = NoticeCategory.fromCode(category),
+        category = noticeCategoryOf(category),
         title = title,
         message = message,
         occurredAt = System.currentTimeMillis(),
-        destination = NoticeDestination.fromCode(destination),
+        destination = noticeDestinationOf(destination),
     )
 
     /** mock flavor 用。実機が無くても画面の確認ができるようにする。 */

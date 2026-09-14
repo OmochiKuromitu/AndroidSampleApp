@@ -1,8 +1,6 @@
 package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.domain.model.Notice
-import com.example.androidsampleapp.domain.model.NoticeCategory
-import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.domain.repository.NoticeRepository
 import com.example.androidsampleapp.model.NoticeResponse
 import javax.inject.Inject
@@ -36,11 +34,11 @@ class NoticeRepositoryImpl @Inject constructor() : NoticeRepository {
 
     private fun NoticeResponse.toDomain(): Notice = Notice(
         id = id,
-        category = NoticeCategory.fromCode(category),
+        category = noticeCategoryOf(category),
         title = title,
         message = message,
         occurredAt = occurredAt,
-        destination = NoticeDestination.fromCode(destination),
+        destination = noticeDestinationOf(destination),
     )
 
     private companion object {
