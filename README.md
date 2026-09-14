@@ -118,7 +118,7 @@ private fun AirconScreenOfflinePreview() {
 現在は 4 画面に 10 個のプレビューがある（着信あり / 待機中、運転中 / 停止中 / 未接続、
 スリープ / スワイプ中、接続あり / 切断）。それぞれライトとダークで描かれる。
 
-土台は `core/mvi/` にある（`Mvi.kt` / `CollectEffect.kt`）。ViewModel の基底クラスは置かず、
+土台は `core/mvi/Mvi.kt`（`UiState` / `UiIntent` / `UiEffect` / `Reducer`）だけ。ViewModel の基底クラスは置かず、
 各 ViewModel が同じ形を自分で書く。どの ViewModel を開いても、状態と Effect の持ち方が
 その場で読めるようにするため。
 
@@ -145,6 +145,14 @@ class XxxViewModel @Inject constructor(/* UseCase */) : ViewModel() {
 - **プロパティは `init` より上に書く。** Kotlin は上から順に初期化するので、`init` の中で
   `onIntent` を呼んだときに `_uiState` や `reducer` がまだ無いと落ちる。
 - 副作用（`handle`）は並行に走らせる。長い I/O が、後から来た Intent の反映を止めないようにするため。
+
+Route は Effect を `LaunchedEffect(viewModel) { viewModel.effect.collect { ... } }` で受け取る。
+
+- 画面が裏に回っている間も受け取る。前面に戻るまで溜めることはしない
+  （壁付けでほぼ常に前面にいる前提。裏にいる間に出たスナックバーは、誰も見ないまま消えることがある）。
+- Effect は Channel なので、1 つの Effect は 1 回しか届かない。1 画面で `collect` するのは 1 か所だけにする。
+- 親から受け取ったコールバックを Effect で呼ぶときは `rememberUpdatedState` 越しに呼ぶ
+  （`SleepRoute` が見本）。`LaunchedEffect` の中身は最初に起動したときのまま動くため。
 
 ### 画面遷移の扱い
 
@@ -456,7 +464,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── MainActivity.kt
 ├── config/                 flavor に対応した設定（AppConfig）
 ├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）
-│   └── mvi/                UiState / UiIntent / UiEffect / Reducer / CollectEffect
+│   └── mvi/                UiState / UiIntent / UiEffect / Reducer
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視
 ├── domain/

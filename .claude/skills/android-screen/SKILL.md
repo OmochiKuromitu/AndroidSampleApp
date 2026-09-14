@@ -131,10 +131,13 @@ fun XxxRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            is XxxEffect.ShowMessage ->
-                snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+    // Effect は LaunchedEffect で受け取る。1 画面で collect するのは 1 か所だけ（Channel なので取り合いになる）
+    LaunchedEffect(viewModel) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is XxxEffect.ShowMessage ->
+                    snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+            }
         }
     }
 
@@ -300,6 +303,10 @@ Reducer と `MessageParser` は Android に依存しない純粋な処理なの�
 タイマーの完了まで進んでしまうので、「まだ発火していない」を確かめたいときに使えない。
 
 ## 踏んだ罠（同じことを繰り返さない）
+
+- **`LaunchedEffect` の中から親のコールバックを直接呼ばない。** `LaunchedEffect(viewModel)` の中身は
+  最初に起動したときのまま動き続けるので、親が新しいラムダを渡しても古いほうが呼ばれる。
+  `val current by rememberUpdatedState(onXxx)` を挟んで `current()` を呼ぶ（`SleepRoute` が見本）。
 
 - **KDoc に `path/*.kt` のようなグロブを書かない。** Kotlin のブロックコメントはネストするので、
   `/*` が内側のコメントを開き、`*/` がそれを閉じてファイル末尾まで飲み込む。バッククォートで囲むか書かない。
