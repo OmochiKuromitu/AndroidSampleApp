@@ -29,8 +29,6 @@ import com.example.androidsampleapp.R
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
-import com.example.androidsampleapp.ui.common.CenteredMessage
-import com.example.androidsampleapp.ui.common.LoadingBox
 import com.example.androidsampleapp.ui.common.NoticeList
 import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.common.PanelPreview
@@ -90,22 +88,14 @@ fun SleepScreen(
                     .weight(1f)
                     .padding(top = dimensions.spaceLarge),
             ) {
-                when {
-                    // 取得済みの一覧があるなら、読み込み中でもそれを出したままにする。
-                    state.isLoadingNotices && state.notices.isEmpty() -> LoadingBox()
-
-                    state.noticeLoadFailed && state.notices.isEmpty() -> CenteredMessage(
-                        message = stringResource(R.string.notice_load_failed),
-                        color = Color.White.copy(alpha = 0.6f),
-                    )
-
-                    else -> NoticeList(
-                        notices = state.notices,
-                        onNoticeClick = onNoticeClick,
-                        onClearClick = onClearNoticesClick,
-                        contentColor = Color.White,
-                    )
-                }
+                NoticeList(
+                    notices = state.notices,
+                    onNoticeClick = onNoticeClick,
+                    onClearClick = onClearNoticesClick,
+                    isLoading = state.isLoadingNotices,
+                    loadFailed = state.noticeLoadFailed,
+                    contentColor = Color.White,
+                )
             }
         }
 
@@ -220,7 +210,7 @@ private fun SleepScreenPreview() {
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
-                apiNotices = previewNotices,
+                notices = previewNotices,
             ),
             onNoticeClick = {},
             onClearNoticesClick = {},
@@ -270,7 +260,7 @@ private fun SleepScreenSwipingPreview() {
             state = SleepState(
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
-                apiNotices = previewNotices,
+                notices = previewNotices,
                 unlockProgress = 0.7f,
             ),
             onNoticeClick = {},

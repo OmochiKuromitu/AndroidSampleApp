@@ -161,13 +161,14 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 | `IdleTimerViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
 | `IncomingCallViewModel` | 着信の `StateFlow` | `IncomingCallRouter` |
 | `MissedCallViewModel` | `MissedCallManager` の取得の促し | `AppNavigation` |
+| `NoticeViewModel` | `NoticeManager` の取得の促し | `AppNavigation` |
 
 「`AppNavigation` が必要とするもの」という 1 つの入れ物にまとめない。それは責務ではなく、
 基準が無い入れ物は画面が増えるたびに無関係なものが同居して太る。
 1 つの窓口が変わる理由は 1 つに保つ。
 
 いずれも画面ではないので MVI は敷かず、状態を持たない素通しにしてある。
-状態の持ち主は `IdleTimer` と `AppStateHolder`。
+状態の持ち主は `IdleTimer`、`AppStateHolder`、各マネージャー。
 
 なお `App`（Application）は `IdleTimer` を直接注入している。こちらは
 `hiltViewModel()` が使えないため。`IdleTimer` が ViewModel ではなく `@Singleton`
@@ -279,32 +280,43 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 進み具合が 1.0 に達した瞬間の 1 回だけ `SleepEffect.Wake` を出す。
 指がさらに動いても重ねて送らない。
 
-### スリープ画面の通知一覧
+### 通知一覧 — NoticeManager
 
-時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
+通知はスリープ画面（時刻表示の下）と、連絡先画面の「お知らせ」タブの 2 か所に出す。
+どちらも同じ一覧で、消去もどちらから押しても同じものが消える。
+消去ボタンは一覧の右上に小さく置く。お知らせタブのバッジは一覧の件数。
 
 1 件ずつ白いカードで出し、1 行目に「種別・タイトル・時刻」、2 行目に詳細を置く。
 **警報（`ALERT`）は上にまとめ、それ以外との間に線を引く。** 並べ替えは表示の都合なので
 `ui/common/NoticeList` で行い、グループの中はサーバから来た順（新しいものが先頭）のまま。
 
-通知の出どころは 2 つある。
+読み手が 2 画面あるので、一覧は `core/NoticeManager`（`@Singleton`）が持つ。
+`MissedCallManager` と同じ形で、取得のきっかけは `AppNavigation` が決め、マネージャーは
+呼ばれたら取るだけ。画面の ViewModel は `snapshot` を購読するだけで、自分では取りに行かない。
 
-| 出どころ | 経路 | 持ち主 | 画面への届き方 |
-| --- | --- | --- | --- |
-| HTTP の API | `NoticeRepository` | `SleepState.apiNotices`（リポジトリは持たない） | 取りに行った結果を `NoticesLoaded` で |
-| 機器（TCP の `NOTICE` 行） | `DeviceRepositoryImpl` → `AppStateHolder` | `AppStateHolder.deviceNotices` | 購読して、届くたびに `DeviceNoticesChanged` で |
+通知の出どころは 2 つあり、`NoticeManager` で合わせる。
+
+| 出どころ | 経路 | 持ち主 |
+| --- | --- | --- |
+| HTTP の API | `NoticeRepository`（状態は持たない） | `NoticeManager` の中 |
+| 機器（TCP の `NOTICE` 行） | `DeviceRepositoryImpl` → `AppStateHolder` | `AppStateHolder.deviceNotices` |
 
 ```
-SleepViewModel.init
-  └─ ObserveDeviceNoticesUseCase().collect { dispatch(DeviceNoticesChanged(it)) }
+AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後）
+  └▶ NoticeManager.refresh() ─▶ GET /notices ─┐
+                                               ├─▶ snapshot: StateFlow<NoticeSnapshot>
+AppStateHolder.deviceNotices ──────────────────┘     （新しい順に合わせた一覧 / 読み込み中 / 失敗）
+                                                      ├▶ SleepViewModel   → NoticesChanged
+                                                      └▶ ContactViewModel → NoticesChanged
 
-SleepState
-  apiNotices ─┐
-              ├─▶ notices（新しい順に合わせたもの。一覧に出すのはこれ）
-  deviceNotices ┘
+SleepViewModel / ContactViewModel（消去を押した）
+  └▶ NoticeManager.clear() ─▶ DELETE /notices ─▶ 機器からの通知を手元から消す ─▶ GET /notices
+                                                  └▶ 同じ snapshot に戻る
 ```
 
-出どころ別に持つのは、API を取り直したときに機器からの分を消さないため（逆も同じ）。
+合わせる場所をマネージャーにしたのは、読み手ごとに合わせ方を書くとずれるため。
+取り込みの経路は別々のままで、混ぜるのは見せる直前だけ。
+API 側と機器側を分けて持つのは、API を取り直したときに機器からの分を消さないため（逆も同じ）。
 合わせて並べるので、`Notice.occurredAt` は表示用の文字列ではなく epoch ミリ秒で持ち、
 整形は `NoticeList` で行う（minSdk 24 なので `java.time` は使わない）。
 
@@ -313,22 +325,14 @@ SleepState
 API の通知と一覧の key が重ならないようにしている。新しいものを先頭に 20 件まで持つ。
 mock flavor では `fakeEvents()` が起動直後に 1 件、以降 20 秒ごとに 1 件流す。
 
-API は取得と消去の 2 本。UseCase もそれに 1 対 1 で対応する。
-
-```
-SleepIntent.Started          ─▶ GetNoticesUseCase   ─▶ GET    /notices
-SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notices
-                                                        ├▶ 機器からの通知を手元から消す
-                                                        └▶ GET /notices（取り直し）
-                                    どちらも結果は SleepIntent.NoticesLoaded として戻る
-```
-
+API は取得と消去の 2 本。`GetNoticesUseCase` と `ClearNoticesUseCase` を `NoticeManager` が使う。
 消去が取り直しまで行うのは、消している間に届いた通知を落とさないため。
-呼び出し側から見れば「消した結果の一覧」が返るだけで、API が 2 本であることを知らずに済む。
-取得も消去も同じ Intent に戻るので、画面の経路は 1 本のままになる。
+取得も消去も同じ `snapshot` に戻るので、画面の経路は 1 本のままになる。
 
-スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
-失敗しても明示的な再試行ボタンは置いていない（次にスリープへ入れば取り直す）。
+`refresh()` は実行中の要求があれば何もしない（重なって遅い順に上書きされるのを防ぐ）。
+失敗しても前回の一覧を残し、失敗だけを立てる。明示的な再試行ボタンは置いていない
+（次に画面が切り替われば取り直す）。`clear()` は利用者の操作なので取りやめず、
+実行中の取得があれば打ち切る。
 
 **API はまだサーバ側が無い。** `NoticeRepositoryImpl` が仮データを返しており、
 `TODO` を付けてある。差し替えるのはこのクラスの中だけで、UseCase から上は変わらない。
@@ -430,7 +434,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── App.kt                  @HiltAndroidApp
 ├── MainActivity.kt
 ├── config/                 flavor に対応した設定（AppConfig）
-├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）
+├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）/ NoticeManager（通知一覧）
 │   └── mvi/                UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視

@@ -1,7 +1,11 @@
 package com.example.androidsampleapp.ui.contact
 
+import com.example.androidsampleapp.core.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.ui.common.Route
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,6 +75,32 @@ class ContactReducerTest {
         val next = reducer.reduce(state, ContactIntent.ListSelected(ContactList.HISTORY))
 
         assertEquals(2, next.missedCallCount)
+    }
+
+    @Test
+    fun `お知らせの一覧と読み込み状態を取り込む`() {
+        val notices = listOf(
+            Notice("1", NoticeCategory.INFO, null, "本文", 100L, NoticeDestination.Top),
+        )
+
+        val next = reducer.reduce(
+            ContactState(),
+            ContactIntent.NoticesChanged(NoticeSnapshot(notices = notices, isLoading = true)),
+        )
+
+        assertEquals(notices, next.notices)
+        assertTrue(next.isLoadingNotices)
+        assertFalse(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `お知らせの変化は電話帳と履歴の読み込み状態に触らない`() {
+        val state = ContactState(isLoading = true)
+
+        val next = reducer.reduce(state, ContactIntent.NoticesChanged(NoticeSnapshot(loadFailed = true)))
+
+        assertTrue(next.isLoading)
+        assertFalse(next.loadFailed)
     }
 
     @Test

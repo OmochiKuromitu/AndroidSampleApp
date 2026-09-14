@@ -5,15 +5,17 @@ import com.example.androidsampleapp.R
 import com.example.androidsampleapp.core.mvi.UiState
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
+import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.ui.common.Route
 
 /**
  * 画面の中のリスト。下部バーのタブとは別物で、遷移は伴わない。
- * どちらを表示しているかは画面の状態なので [ContactState] が持つ。
+ * どれを表示しているかは画面の状態なので [ContactState] が持つ。
  */
 enum class ContactList(@StringRes val labelRes: Int) {
     PHONEBOOK(R.string.contact_phonebook),
     HISTORY(R.string.contact_history),
+    NOTICE(R.string.contact_notice),
     ;
 
     companion object {
@@ -34,4 +36,8 @@ data class ContactState(
     val loadFailed: Boolean = false,
     /** 履歴タブに出すバッジの件数。0 なら出さない。 */
     val missedCallCount: Int = 0,
+    /** お知らせタブに出す一覧。持ち主は NoticeManager で、ここにはその写しが入る。 */
+    val notices: List<Notice> = emptyList(),
+    val isLoadingNotices: Boolean = false,
+    val noticeLoadFailed: Boolean = false,
 ) : UiState

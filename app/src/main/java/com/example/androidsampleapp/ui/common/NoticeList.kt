@@ -54,6 +54,8 @@ import java.util.Locale
  *
  * スリープ画面のような暗い背景にも置くため、カードの外の文字色と線の色は
  * [contentColor] で受け取る。カードの中はテーマに関係なく白地に濃い文字。
+ *
+ * 読み込み中と失敗の出し分けもここで持つ。スリープ画面と連絡先画面で同じにするため。
  */
 @Composable
 fun NoticeList(
@@ -61,8 +63,24 @@ fun NoticeList(
     onNoticeClick: (Notice) -> Unit,
     onClearClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    loadFailed: Boolean = false,
     contentColor: Color = MaterialTheme.colorScheme.onBackground,
 ) {
+    // 取得済みの一覧があるなら、読み込み中でも失敗してもそれを出したままにする。
+    if (notices.isEmpty() && isLoading) {
+        LoadingBox(modifier = modifier)
+        return
+    }
+    if (notices.isEmpty() && loadFailed) {
+        CenteredMessage(
+            message = stringResource(R.string.notice_load_failed),
+            modifier = modifier,
+            color = contentColor.copy(alpha = 0.6f),
+        )
+        return
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),

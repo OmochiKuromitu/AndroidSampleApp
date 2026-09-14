@@ -210,7 +210,7 @@ data class NavigateToAircon(...) : SleepEffect
 | --- | --- | --- |
 | `XxxState` | 画面固有（送信中フラグ、入力中の値、表示の進み具合） | その画面の Reducer |
 | `core/AppStateHolder` | 機器から TCP で降ってくる状態（接続、着信、エアコン、機器からの通知） | `data/DeviceRepositoryImpl` だけ |
-| 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数） | そのクラス自身 |
+| 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数、`NoticeManager` の通知一覧） | そのクラス自身 |
 
 **読み手が 1 画面なら共有の器を作らない。** その画面の `XxxState` に持たせる。
 読み手が 2 か所以上になった時点で `@Singleton` に引き上げる。
@@ -229,8 +229,9 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
 ## データを足す
 
 機器（TCP/UDP）と API（HTTP）で経路が違う。混ぜない。
-画面で 1 つの一覧に合わせたいときも、取り込みまでは別々に通し、画面の `XxxState` に
-出どころ別に持たせて合わせる（見本は `SleepState` の `apiNotices` / `deviceNotices` / `notices`）。
+1 つの一覧に合わせたいときも、取り込みまでは別々に通し、見せる直前で合わせる。
+読み手が 1 画面ならその `XxxState` で、複数ならマネージャーで合わせる
+（見本は `core/NoticeManager` の `snapshot`）。読み手ごとに合わせ方を書くとずれる。
 並べ替えるなら時刻は比べられる値（epoch ミリ秒）で持ち、一覧の key が出どころ間で重ならないようにする。
 
 - **機器から来る** — `network/MessageParser` に解釈を足し、`model/DeviceMessage` に型を足し、
@@ -272,6 +273,11 @@ Reducer と `MessageParser` は Android に依存しない純粋な処理なの�
 時間に依存するもの（`IdleTimer`）は `runTest` の仮想時間で書く。
 `runCurrent()` と `advanceTimeBy()` を使い分けること。`advanceUntilIdle()` は
 タイマーの完了まで進んでしまうので、「まだ発火していない」を確かめたいときに使えない。
+
+マネージャーのように `backgroundScope` で動かすものは、逆に `advanceUntilIdle()` では進まない。
+`backgroundScope` のコルーチンは待ち対象に入らず、中の `delay` を越えないまま戻ってくる。
+`advanceTimeBy()` で時間を明示して進め、`runCurrent()` で流す（`MissedCallManagerTest` が見本）。
+過去にこれで `MissedCallManagerTest` が 6 本とも落ちたまま気づかれなかった。
 
 ## 踏んだ罠（同じことを繰り返さない）
 

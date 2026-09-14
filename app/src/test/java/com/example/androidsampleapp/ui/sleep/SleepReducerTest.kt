@@ -1,5 +1,6 @@
 package com.example.androidsampleapp.ui.sleep
 
+import com.example.androidsampleapp.core.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
@@ -20,98 +21,30 @@ class SleepReducerTest {
         Notice(id, NoticeCategory.CALL, null, "玄関から呼び出し", occurredAt, NoticeDestination.Top)
 
     @Test
-    fun `Started で通知の取得中になる`() {
-        val next = reducer.reduce(SleepState(noticeLoadFailed = true), SleepIntent.Started)
-
-        assertTrue(next.isLoadingNotices)
-        assertFalse(next.noticeLoadFailed)
-    }
-
-    @Test
-    fun `消去を押したときも取得中になる`() {
-        // 消去は取り直しまで含む 1 つの操作なので、取得と同じ扱いにする。
-        val next = reducer.reduce(SleepState(), SleepIntent.ClearNoticesClicked)
-
-        assertTrue(next.isLoadingNotices)
-    }
-
-    @Test
-    fun `取得できた一覧が入る`() {
+    fun `一覧の変化で通知と読み込み状態が入る`() {
         val next = reducer.reduce(
             SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(notices),
+            SleepIntent.NoticesChanged(NoticeSnapshot(notices = notices, loadFailed = true)),
         )
 
         assertEquals(notices, next.notices)
-        assertFalse(next.isLoadingNotices)
-    }
-
-    @Test
-    fun `消去後の空の一覧も同じ経路で入る`() {
-        val next = reducer.reduce(
-            SleepState(apiNotices = notices, isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(emptyList()),
-        )
-
-        assertTrue(next.notices.isEmpty())
-        assertFalse(next.isLoadingNotices)
-    }
-
-    @Test
-    fun `機器からの通知が入る`() {
-        val device = listOf(notice(id = "device-1", occurredAt = 200L))
-
-        val next = reducer.reduce(SleepState(), SleepIntent.DeviceNoticesChanged(device))
-
-        assertEquals(device, next.notices)
-    }
-
-    @Test
-    fun `API を取り直しても機器からの通知は残る`() {
-        val device = listOf(notice(id = "device-1", occurredAt = 200L))
-
-        val next = reducer.reduce(
-            SleepState(deviceNotices = device, isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(emptyList()),
-        )
-
-        assertEquals(device, next.notices)
-    }
-
-    @Test
-    fun `機器からの通知が変わっても API の一覧は残る`() {
-        val next = reducer.reduce(
-            SleepState(apiNotices = notices),
-            SleepIntent.DeviceNoticesChanged(emptyList()),
-        )
-
-        assertEquals(notices, next.notices)
-    }
-
-    @Test
-    fun `出どころの違う通知は新しい順に混ざる`() {
-        val state = SleepState(
-            apiNotices = listOf(notice("api-new", 300L), notice("api-old", 100L)),
-            deviceNotices = listOf(notice("device-mid", 200L)),
-        )
-
-        assertEquals(listOf("api-new", "device-mid", "api-old"), state.notices.map { it.id })
-    }
-
-    @Test
-    fun `取得に失敗したら取得中が解けて失敗が立つ`() {
-        val next = reducer.reduce(
-            SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesLoadFailed,
-        )
-
         assertFalse(next.isLoadingNotices)
         assertTrue(next.noticeLoadFailed)
     }
 
     @Test
+    fun `消去を押しても読み込み中を先読みしない`() {
+        // 読み込み中かどうかは NoticeManager が決めて NoticesChanged で戻る。
+        val state = SleepState(notices = notices)
+
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesClicked)
+
+        assertEquals(state, next)
+    }
+
+    @Test
     fun `通知のタップは状態を変えない`() {
-        val state = SleepState(apiNotices = notices)
+        val state = SleepState(notices = notices)
 
         val next = reducer.reduce(state, SleepIntent.NoticeClicked(notices.first()))
 

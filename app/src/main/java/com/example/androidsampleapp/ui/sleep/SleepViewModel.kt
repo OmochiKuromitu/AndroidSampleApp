@@ -1,11 +1,8 @@
 package com.example.androidsampleapp.ui.sleep
 
 import androidx.lifecycle.viewModelScope
+import com.example.androidsampleapp.core.NoticeManager
 import com.example.androidsampleapp.core.mvi.MviViewModel
-import com.example.androidsampleapp.domain.model.Notice
-import com.example.androidsampleapp.domain.usecase.ClearNoticesUseCase
-import com.example.androidsampleapp.domain.usecase.GetNoticesUseCase
-import com.example.androidsampleapp.domain.usecase.ObserveDeviceNoticesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -17,9 +14,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SleepViewModel @Inject constructor(
-    private val getNotices: GetNoticesUseCase,
-    private val clearNotices: ClearNoticesUseCase,
-    observeDeviceNotices: ObserveDeviceNoticesUseCase,
+    private val noticeManager: NoticeManager,
 ) : MviViewModel<SleepState, SleepIntent, SleepEffect>(
     initialState = SleepState(),
     reducer = SleepReducer(),
@@ -29,10 +24,10 @@ class SleepViewModel @Inject constructor(
     private val dateFormat = SimpleDateFormat("M月d日 (E)", Locale.getDefault())
 
     init {
-        // 機器からの通知は取りに行くものではなく降ってくるもの。購読して、届くたびに Intent にする。
-        // StateFlow なので、スリープに入る前に届いていた分も購読した時点で流れてくる。
+        // 取得は NoticeManager が行い、きっかけは AppNavigation が決める。ここは一覧を見るだけ。
+        // StateFlow なので、スリープに入る前に取れていた分も購読した時点で流れてくる。
         viewModelScope.launch {
-            observeDeviceNotices().collect { dispatch(SleepIntent.DeviceNoticesChanged(it)) }
+            noticeManager.snapshot.collect { dispatch(SleepIntent.NoticesChanged(it)) }
         }
         viewModelScope.launch {
             while (isActive) {
@@ -41,16 +36,12 @@ class SleepViewModel @Inject constructor(
                 delay(TICK_INTERVAL_MS)
             }
         }
-        dispatch(SleepIntent.Started)
     }
 
     override suspend fun handle(intent: SleepIntent, previous: SleepState, current: SleepState) {
         when (intent) {
-            // スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
-            SleepIntent.Started -> load { getNotices() }
-
-            // 消去は「消して取り直す」までが 1 つの操作。結果は取得と同じ経路で戻る。
-            SleepIntent.ClearNoticesClicked -> load { clearNotices() }
+            // 結果は NoticeManager の一覧の変化として NoticesChanged で戻る。
+            SleepIntent.ClearNoticesClicked -> noticeManager.clear()
 
             // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
             is SleepIntent.UnlockDragged ->
@@ -62,18 +53,10 @@ class SleepViewModel @Inject constructor(
                 sendEffect(SleepEffect.NoticeSelected(intent.notice.destination))
 
             SleepIntent.UnlockCancelled,
-            is SleepIntent.NoticesLoaded,
-            SleepIntent.NoticesLoadFailed,
-            is SleepIntent.DeviceNoticesChanged,
+            is SleepIntent.NoticesChanged,
             is SleepIntent.Ticked,
             -> Unit
         }
-    }
-
-    private suspend fun load(fetch: suspend () -> List<Notice>) {
-        runCatching { fetch() }
-            .onSuccess { dispatch(SleepIntent.NoticesLoaded(it)) }
-            .onFailure { dispatch(SleepIntent.NoticesLoadFailed) }
     }
 
     private companion object {

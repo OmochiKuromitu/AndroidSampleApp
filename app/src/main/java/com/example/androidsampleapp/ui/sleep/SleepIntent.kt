@@ -1,20 +1,14 @@
 package com.example.androidsampleapp.ui.sleep
 
+import com.example.androidsampleapp.core.NoticeSnapshot
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.Notice
 
 sealed interface SleepIntent : UiIntent {
-    /** 画面の生成時に 1 度だけ流す。ここで通知を取りに行く。 */
-    data object Started : SleepIntent
-
     data class Ticked(val timeText: String, val dateText: String) : SleepIntent
 
-    /** 取得の結果。消去の結果もここに戻る（消去は取り直しを伴うため）。 */
-    data class NoticesLoaded(val notices: List<Notice>) : SleepIntent
-    data object NoticesLoadFailed : SleepIntent
-
-    /** 機器から届いた通知の変化。スリープ中でも届くたびに流れる。 */
-    data class DeviceNoticesChanged(val notices: List<Notice>) : SleepIntent
+    /** NoticeManager の一覧の変化。取得・消去の結果も、機器から届いた通知もここに戻る。 */
+    data class NoticesChanged(val snapshot: NoticeSnapshot) : SleepIntent
 
     data object ClearNoticesClicked : SleepIntent
     data class NoticeClicked(val notice: Notice) : SleepIntent

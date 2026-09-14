@@ -28,17 +28,21 @@ import androidx.compose.ui.unit.dp
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
+import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeCategory
+import com.example.androidsampleapp.domain.model.NoticeDestination
 import com.example.androidsampleapp.ui.common.CenteredMessage
 import com.example.androidsampleapp.ui.common.LoadingBox
+import com.example.androidsampleapp.ui.common.NoticeList
 import com.example.androidsampleapp.ui.common.PanelPreview
 import com.example.androidsampleapp.ui.common.PreviewSurface
 import com.example.androidsampleapp.ui.theme.TagAlert
 import com.example.androidsampleapp.ui.theme.dimensions
 
 /**
- * 連絡先画面の表示。電話帳と履歴を画面内のタブで出し分ける。
+ * 連絡先画面の表示。電話帳・履歴・お知らせを画面内のタブで出し分ける。
  *
- * この 2 つは遷移を伴わないので、下部バーのタブとは別物。どちらを出しているかは
+ * これらは遷移を伴わないので、下部バーのタブとは別物。どちらを出しているかは
  * [ContactState.selectedList] が持ち、切り替えても通信は起きない。
  *
  * 入口は [ContactRoute]。
@@ -48,12 +52,18 @@ import com.example.androidsampleapp.ui.theme.dimensions
 fun ContactScreen(
     state: ContactState,
     onListSelect: (ContactList) -> Unit,
+    onNoticeClick: (Notice) -> Unit,
+    onClearNoticesClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = state.selectedList.ordinal) {
             ContactList.entries.forEach { list ->
-                val badgeCount = if (list == ContactList.HISTORY) state.missedCallCount else 0
+                val badgeCount = when (list) {
+                    ContactList.HISTORY -> state.missedCallCount
+                    ContactList.NOTICE -> state.notices.size
+                    ContactList.PHONEBOOK -> 0
+                }
                 Tab(
                     selected = list == state.selectedList,
                     onClick = { onListSelect(list) },
@@ -69,6 +79,18 @@ fun ContactScreen(
         }
 
         when {
+            // お知らせは取得元が別なので、電話帳と履歴の読み込み状態に引きずられない。
+            state.selectedList == ContactList.NOTICE -> NoticeList(
+                notices = state.notices,
+                onNoticeClick = onNoticeClick,
+                onClearClick = onClearNoticesClick,
+                isLoading = state.isLoadingNotices,
+                loadFailed = state.noticeLoadFailed,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = MaterialTheme.dimensions.spaceMedium),
+            )
+
             state.isLoading -> LoadingBox()
 
             state.loadFailed -> CenteredMessage(
@@ -79,6 +101,7 @@ fun ContactScreen(
             else -> when (state.selectedList) {
                 ContactList.PHONEBOOK -> PhonebookList(state.contacts)
                 ContactList.HISTORY -> CallHistoryList(state.histories)
+                ContactList.NOTICE -> Unit
             }
         }
     }
@@ -152,6 +175,15 @@ private val previewHistories = listOf(
     CallHistory("3", "駐車場", "9月10日 08:12", isMissed = true),
 )
 
+/** プレビューの時刻を固定するための基準（2026-09-11 15:00 JST）。 */
+private const val PREVIEW_NOW = 1_789_106_400_000L
+private const val PREVIEW_HOUR = 60 * 60 * 1000L
+
+private val previewNotices = listOf(
+    Notice("1", NoticeCategory.ALERT, "フィルター", "フィルターの清掃時期です", PREVIEW_NOW - 3 * PREVIEW_HOUR, NoticeDestination.Aircon),
+    Notice("2", NoticeCategory.INFO, null, "システムを起動しました", PREVIEW_NOW - 30 * PREVIEW_HOUR, NoticeDestination.Top),
+)
+
 @PanelPreview
 @Composable
 private fun ContactScreenPhonebookPreview() {
@@ -164,6 +196,8 @@ private fun ContactScreenPhonebookPreview() {
                 missedCallCount = 2,
             ),
             onListSelect = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
         )
     }
 }
@@ -180,6 +214,25 @@ private fun ContactScreenHistoryPreview() {
                 missedCallCount = 2,
             ),
             onListSelect = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun ContactScreenNoticePreview() {
+    PreviewSurface {
+        ContactScreen(
+            state = ContactState(
+                selectedList = ContactList.NOTICE,
+                missedCallCount = 2,
+                notices = previewNotices,
+            ),
+            onListSelect = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
         )
     }
 }
@@ -188,6 +241,11 @@ private fun ContactScreenHistoryPreview() {
 @Composable
 private fun ContactScreenLoadFailedPreview() {
     PreviewSurface {
-        ContactScreen(state = ContactState(loadFailed = true), onListSelect = {})
+        ContactScreen(
+            state = ContactState(loadFailed = true),
+            onListSelect = {},
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+        )
     }
 }

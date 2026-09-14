@@ -3,6 +3,7 @@ package com.example.androidsampleapp.ui.contact
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.core.MissedCallManager
+import com.example.androidsampleapp.core.NoticeManager
 import com.example.androidsampleapp.core.mvi.MviViewModel
 import com.example.androidsampleapp.domain.usecase.GetCallHistoriesUseCase
 import com.example.androidsampleapp.domain.usecase.GetContactsUseCase
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val missedCallManager: MissedCallManager,
+    private val noticeManager: NoticeManager,
     private val getContacts: GetContactsUseCase,
     private val getCallHistories: GetCallHistoriesUseCase,
 ) : MviViewModel<ContactState, ContactIntent, ContactEffect>(
@@ -34,6 +36,10 @@ class ContactViewModel @Inject constructor(
                 dispatch(ContactIntent.MissedCallCountChanged(it))
             }
         }
+        // 取得は NoticeManager が行い、きっかけは AppNavigation が決める。ここは一覧を見るだけ。
+        viewModelScope.launch {
+            noticeManager.snapshot.collect { dispatch(ContactIntent.NoticesChanged(it)) }
+        }
         dispatch(ContactIntent.Started)
     }
 
@@ -52,9 +58,16 @@ class ContactViewModel @Inject constructor(
             is ContactIntent.ListSelected ->
                 if (intent.list == ContactList.HISTORY) missedCallManager.markAsRead()
 
+            // 結果は NoticeManager の一覧の変化として NoticesChanged で戻る。
+            ContactIntent.ClearNoticesClicked -> noticeManager.clear()
+
+            is ContactIntent.NoticeClicked ->
+                sendEffect(ContactEffect.NoticeSelected(intent.notice.destination))
+
             is ContactIntent.Loaded,
             ContactIntent.LoadFailed,
             is ContactIntent.MissedCallCountChanged,
+            is ContactIntent.NoticesChanged,
             -> Unit
         }
     }
