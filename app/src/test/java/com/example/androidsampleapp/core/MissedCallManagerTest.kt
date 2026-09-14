@@ -8,7 +8,9 @@ import com.example.androidsampleapp.domain.usecase.MarkMissedCallsAsReadUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -44,6 +46,18 @@ class MissedCallManagerTest {
         }
     }
 
+    /**
+     * 実行中の要求が終わるところまで仮想時間を進める。
+     *
+     * マネージャーは [TestScope.backgroundScope] で動かしている。そこで起動したコルーチンは
+     * `advanceUntilIdle()` の待ち対象に入らず、偽リポジトリの `delay` を越えないまま戻ってくる。
+     * そのため時間を明示して進める。
+     */
+    private fun TestScope.settle() {
+        advanceTimeBy(SETTLE_MS)
+        runCurrent()
+    }
+
     private fun manager(repository: ContactRepository, scope: CoroutineScope) =
         MissedCallManager(
             getMissedCallCount = GetMissedCallCountUseCase(repository),
@@ -57,7 +71,7 @@ class MissedCallManagerTest {
         val manager = manager(repository, backgroundScope)
 
         manager.refresh()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(1, manager.missedCallCount.value)
     }
@@ -71,7 +85,7 @@ class MissedCallManagerTest {
         manager.refresh()
         manager.refresh()
         manager.refresh()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(1, repository.getCount)
     }
@@ -82,9 +96,9 @@ class MissedCallManagerTest {
         val manager = manager(repository, backgroundScope)
 
         manager.refresh()
-        advanceUntilIdle()
+        settle()
         manager.refresh()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(2, repository.getCount)
         assertEquals(2, manager.missedCallCount.value)
@@ -95,11 +109,11 @@ class MissedCallManagerTest {
         val repository = FakeContactRepository()
         val manager = manager(repository, backgroundScope)
         manager.refresh()
-        advanceUntilIdle()
+        settle()
         assertEquals(1, manager.missedCallCount.value)
 
         manager.markAsRead()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(1, repository.readCount)
         assertEquals(0, manager.missedCallCount.value)
@@ -113,7 +127,7 @@ class MissedCallManagerTest {
 
         manager.refresh()
         manager.markAsRead()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(1, repository.readCount)
         assertEquals(0, manager.missedCallCount.value)
@@ -127,13 +141,18 @@ class MissedCallManagerTest {
         val manager = manager(repository, backgroundScope)
 
         manager.refresh()
-        advanceUntilIdle()
+        settle()
         assertEquals(5, manager.missedCallCount.value)
 
         shouldFail = true
         manager.refresh()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(5, manager.missedCallCount.value)
+    }
+
+    private companion object {
+        /** 偽リポジトリの遅延（100ms）を 2 回分越えられる長さ。 */
+        const val SETTLE_MS = 1_000L
     }
 }
