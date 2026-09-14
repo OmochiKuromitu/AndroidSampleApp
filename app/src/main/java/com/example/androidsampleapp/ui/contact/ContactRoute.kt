@@ -18,11 +18,11 @@ fun ContactRoute(
     modifier: Modifier = Modifier,
     viewModel: ContactViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     ContactScreen(
         state = state,
-        onListSelect = { viewModel.dispatch(ContactIntent.ListSelected(it)) },
+        onListSelect = { viewModel.onIntent(ContactIntent.ListSelected(it)) },
         modifier = modifier,
     )
 }

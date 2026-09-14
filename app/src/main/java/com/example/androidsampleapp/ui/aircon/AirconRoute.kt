@@ -21,7 +21,7 @@ fun AirconRoute(
     modifier: Modifier = Modifier,
     viewModel: AirconViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     CollectEffect(viewModel.effect) { effect ->
@@ -33,10 +33,10 @@ fun AirconRoute(
 
     AirconScreen(
         state = state,
-        onPowerToggle = { viewModel.dispatch(AirconIntent.PowerToggled(it)) },
-        onTemperatureDownClick = { viewModel.dispatch(AirconIntent.TemperatureDownClicked) },
-        onTemperatureUpClick = { viewModel.dispatch(AirconIntent.TemperatureUpClicked) },
-        onModeSelect = { viewModel.dispatch(AirconIntent.ModeSelected(it)) },
+        onPowerToggle = { viewModel.onIntent(AirconIntent.PowerToggled(it)) },
+        onTemperatureDownClick = { viewModel.onIntent(AirconIntent.TemperatureDownClicked) },
+        onTemperatureUpClick = { viewModel.onIntent(AirconIntent.TemperatureUpClicked) },
+        onModeSelect = { viewModel.onIntent(AirconIntent.ModeSelected(it)) },
         modifier = modifier,
     )
 }

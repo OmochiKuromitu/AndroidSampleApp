@@ -21,7 +21,7 @@ fun SleepRoute(
     modifier: Modifier = Modifier,
     viewModel: SleepViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     CollectEffect(viewModel.effect) { effect ->
         when (effect) {
@@ -32,10 +32,10 @@ fun SleepRoute(
 
     SleepScreen(
         state = state,
-        onNoticeClick = { viewModel.dispatch(SleepIntent.NoticeClicked(it)) },
-        onClearNoticesClick = { viewModel.dispatch(SleepIntent.ClearNoticesClicked) },
-        onUnlockDrag = { viewModel.dispatch(SleepIntent.UnlockDragged(it)) },
-        onUnlockCancel = { viewModel.dispatch(SleepIntent.UnlockCancelled) },
+        onNoticeClick = { viewModel.onIntent(SleepIntent.NoticeClicked(it)) },
+        onClearNoticesClick = { viewModel.onIntent(SleepIntent.ClearNoticesClicked) },
+        onUnlockDrag = { viewModel.onIntent(SleepIntent.UnlockDragged(it)) },
+        onUnlockCancel = { viewModel.onIntent(SleepIntent.UnlockCancelled) },
         modifier = modifier,
     )
 }

@@ -14,7 +14,7 @@ description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付け�
 1. **遷移を書くのは `ui/navigation/AppNavigation.kt` だけ。** `NavController` を持つのもここだけ。
    画面や ViewModel から `navigate` を呼ばない。
 2. **`XxxScreen` は表示だけ。** ViewModel も Intent も Effect も知らない。配線は `XxxRoute`。
-   Screen は操作ごとのコールバックを受け取り、それを Intent に変えて `dispatch` するのは Route。
+   Screen は操作ごとのコールバックを受け取り、それを Intent に変えて `onIntent` に渡すのは Route。
 3. **Reducer は純粋関数。** I/O・時刻取得・コルーチン起動を書かない。副作用は ViewModel の `handle()`。
 4. **状態が変わる入口は Reducer だけ。** 通信結果も共有状態の変化も Intent に変換して通す。
 
@@ -28,7 +28,7 @@ description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付け�
 | `XxxIntent.kt` | `UiIntent` を実装した sealed interface |
 | `XxxEffect.kt` | `UiEffect` を実装した sealed interface |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
-| `XxxViewModel.kt` | `MviViewModel` を継承。`@HiltViewModel` |
+| `XxxViewModel.kt` | `ViewModel` を継承し、`_uiState` / `_effect` / `reducer` を自分で持つ。`@HiltViewModel` |
 | `XxxRoute.kt` | 配線。ViewModel 取得、State 購読、Effect 受け取り、`LaunchedEffect` |
 | `XxxScreen.kt` | 表示。`state` と操作ごとのコールバックだけを受け取る。プレビューもここ |
 
@@ -64,27 +64,46 @@ class XxxReducer : Reducer<XxxState, XxxIntent> {
     }
 }
 
-// XxxViewModel.kt
+// XxxViewModel.kt — 基底クラスは使わない。どの ViewModel もこの形で書く
 @HiltViewModel
 class XxxViewModel @Inject constructor(
     observeItems: ObserveItemsUseCase,
     private val doSomething: DoSomethingUseCase,
-) : MviViewModel<XxxState, XxxIntent, XxxEffect>(
-    initialState = XxxState(),
-    reducer = XxxReducer(),
-) {
+) : ViewModel() {
+
+    // init より上に書く（init の中で onIntent を呼んだときに、まだ初期化されていないと落ちる）
+    private val _uiState = MutableStateFlow(XxxState())
+    val uiState: StateFlow<XxxState> = _uiState.asStateFlow()
+
+    private val _effect = Channel<XxxEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
+
+    private val reducer = XxxReducer()
+
     init {
         // 共有状態の変化も Intent に変換して Reducer に通す
         viewModelScope.launch {
-            observeItems().collect { dispatch(XxxIntent.ItemsChanged(it)) }
+            observeItems().collect { onIntent(XxxIntent.ItemsChanged(it)) }
         }
-        dispatch(XxxIntent.Started)
+        onIntent(XxxIntent.Started)
     }
 
-    override suspend fun handle(intent: XxxIntent, previous: XxxState, current: XxxState) {
+    /** 状態を変えうる入力の入口。操作も、購読した値の変化も、通信の結果も、すべてここを通す。 */
+    fun onIntent(intent: XxxIntent) {
+        var previous: XxxState
+        var current: XxxState
+        // 読んでから書くまでの間に別の更新が入っていたら、読み直してやり直す。
+        do {
+            previous = _uiState.value
+            current = reducer.reduce(previous, intent)
+        } while (!_uiState.compareAndSet(previous, current))
+        viewModelScope.launch { handle(intent, previous, current) }
+    }
+
+    private suspend fun handle(intent: XxxIntent, previous: XxxState, current: XxxState) {
         when (intent) {
             is XxxIntent.ItemClicked -> runCatching { doSomething(intent.id) }
-                .onFailure { sendEffect(XxxEffect.ShowMessage(R.string.command_failed)) }
+                .onFailure { _effect.send(XxxEffect.ShowMessage(R.string.command_failed)) }
 
             XxxIntent.Started,
             is XxxIntent.ItemsChanged,
@@ -94,6 +113,8 @@ class XxxViewModel @Inject constructor(
     }
 }
 ```
+
+副作用が無い画面（`MainViewModel`）は、`onIntent` を `_uiState.update { reducer.reduce(it, intent) }` だけにしてよい。
 
 `handle()` が `previous` と `current` の両方を受け取るのは、「またいだ瞬間の 1 回だけ」を
 表現するため。例: `ui/sleep/SleepViewModel` はスワイプの進み具合が 1.0 に達した瞬間だけ
@@ -107,7 +128,7 @@ fun XxxRoute(
     modifier: Modifier = Modifier,
     viewModel: XxxViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     CollectEffect(viewModel.effect) { effect ->
@@ -120,7 +141,7 @@ fun XxxRoute(
     // 操作を Intent に変えるのは Route。Screen に Intent を渡さない
     XxxScreen(
         state = state,
-        onItemClick = { viewModel.dispatch(XxxIntent.ItemClicked(it)) },
+        onItemClick = { viewModel.onIntent(XxxIntent.ItemClicked(it)) },
         modifier = modifier,
     )
 }

@@ -22,7 +22,7 @@ fun TopRoute(
     modifier: Modifier = Modifier,
     viewModel: TopViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     CollectEffect(viewModel.effect) { effect ->
@@ -34,8 +34,8 @@ fun TopRoute(
 
     TopScreen(
         state = state,
-        onAnswerClick = { viewModel.dispatch(TopIntent.AnswerClicked) },
-        onRejectClick = { viewModel.dispatch(TopIntent.RejectClicked) },
+        onAnswerClick = { viewModel.onIntent(TopIntent.AnswerClicked) },
+        onRejectClick = { viewModel.onIntent(TopIntent.RejectClicked) },
         modifier = modifier,
     )
 }

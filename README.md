@@ -49,11 +49,11 @@ Android Studio でこのディレクトリを開く。実行構成は 4 つ（mo
      ┌──────────────── State ────────────────┐
      │                                        │
      ▼                                        │
- Composable ──dispatch(Intent)──▶ ViewModel ──┤
+ Composable ──onIntent(Intent)──▶ ViewModel ──┤
      ▲                               │        │
      │                               ├── Reducer(state, intent) -> state   純粋関数
      └────collect(Effect)────────────┘        │
-                             handle(...) ─────┘  UseCase 呼び出し・Effect 送出・追加 dispatch
+                             handle(...) ─────┘  UseCase 呼び出し・Effect 送出・追加 onIntent
 ```
 
 - **State** — 画面が描画に使う唯一の入力。不変の data class。
@@ -76,7 +76,7 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | `XxxIntent.kt` | 入力の一覧。`UiIntent` を実装した sealed interface |
 | `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface。遷移の命令は書かない |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
-| `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
+| `XxxViewModel.kt` | `ViewModel` を継承し、`_uiState` と `_effect` を自分で持つ。`handle()` に副作用を隔離 |
 | `XxxRoute.kt` | 配線。ViewModel の取得、State の購読、Effect の受け取り、`LaunchedEffect` |
 | `XxxScreen.kt` | 表示。State を描き、操作をコールバックで返すだけ。Intent は知らない |
 
@@ -84,7 +84,7 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 
 - `XxxRoute` — `AppNavigation` から呼ばれる入口。`hiltViewModel()` で ViewModel を取り、
   State を購読し、Effect を受けて呼び出し元のコールバックへ流す。`LaunchedEffect` もここ。
-  Screen から返ってきた操作を Intent に変えて `dispatch` するのもここだけ。
+  Screen から返ってきた操作を Intent に変えて `onIntent` に渡すのもここだけ。
 - `XxxScreen` — `state` と、操作ごとのコールバック（`onAnswerClick: () -> Unit`、
   `onModeSelect: (AirconMode) -> Unit` など）だけを受け取る。
   ViewModel も Intent も Effect も知らない。
@@ -118,9 +118,33 @@ private fun AirconScreenOfflinePreview() {
 現在は 4 画面に 10 個のプレビューがある（着信あり / 待機中、運転中 / 停止中 / 未接続、
 スリープ / スワイプ中、接続あり / 切断）。それぞれライトとダークで描かれる。
 
-土台は `core/mvi/` にある（`Mvi.kt` / `MviViewModel.kt` / `CollectEffect.kt`）。
-`MviViewModel` は Intent を 1 本のチャネルに集約し、到着順に reduce する。
-副作用だけは並行に走らせて、長い I/O が後続 Intent の reduce を止めないようにしている。
+土台は `core/mvi/` にある（`Mvi.kt` / `CollectEffect.kt`）。ViewModel の基底クラスは置かず、
+各 ViewModel が同じ形を自分で書く。どの ViewModel を開いても、状態と Effect の持ち方が
+その場で読めるようにするため。
+
+```kotlin
+@HiltViewModel
+class XxxViewModel @Inject constructor(/* UseCase */) : ViewModel() {
+    private val _uiState = MutableStateFlow(XxxState())
+    val uiState: StateFlow<XxxState> = _uiState.asStateFlow()
+
+    private val _effect = Channel<XxxEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
+
+    private val reducer = XxxReducer()
+
+    init { /* 購読して onIntent に流す */ }
+
+    fun onIntent(intent: XxxIntent) {
+        // Reducer で次の状態を作って入れる。読んでから書くまでに別の更新が入ったらやり直す。
+        // そのあと handle(intent, previous, current) を並行に起動する。
+    }
+}
+```
+
+- **プロパティは `init` より上に書く。** Kotlin は上から順に初期化するので、`init` の中で
+  `onIntent` を呼んだときに `_uiState` や `reducer` がまだ無いと落ちる。
+- 副作用（`handle`）は並行に走らせる。長い I/O が、後から来た Intent の反映を止めないようにするため。
 
 ### 画面遷移の扱い
 
@@ -297,7 +321,7 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 
 ```
 SleepViewModel.init
-  └─ ObserveDeviceNoticesUseCase().collect { dispatch(DeviceNoticesChanged(it)) }
+  └─ ObserveDeviceNoticesUseCase().collect { onIntent(DeviceNoticesChanged(it)) }
 
 SleepState
   apiNotices ─┐
@@ -432,7 +456,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── MainActivity.kt
 ├── config/                 flavor に対応した設定（AppConfig）
 ├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）
-│   └── mvi/                UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect
+│   └── mvi/                UiState / UiIntent / UiEffect / Reducer / CollectEffect
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視
 ├── domain/
