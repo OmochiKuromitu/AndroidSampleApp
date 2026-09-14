@@ -1,7 +1,8 @@
 # AndroidSampleApp
 
-Jetpack Compose + MVI の Android アプリ。壁付けの操作パネルを想定していて、
-機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばスリープ画面に落ちる。
+Jetpack Compose + MVI の Android アプリ。自作のラズパイの壁付けの操作パネル利用していて、
+機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばタブをスリープ画面にする。
+
 
 - 下部バーで 4 タブ（トップ / エアコン / 連絡先 / スリープ）
 - 画面遷移も含めて Intent → Reducer を通す
