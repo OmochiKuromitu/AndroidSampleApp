@@ -280,6 +280,32 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 進み具合が 1.0 に達した瞬間の 1 回だけ `SleepEffect.Wake` を出す。
 指がさらに動いても重ねて送らない。
 
+### HTTP で取るデータ — リポジトリの StateFlow
+
+電話帳・履歴（`ContactRepository.addressBook`）と API の通知（`NoticeRepository.notices`）は、
+取った結果をリポジトリが `MutableStateFlow` で持ち、`StateFlow` で公開する。
+ViewModel は `init` で購読し、値が流れるたびに Intent にして Reducer に通す。
+機器から降ってくる状態（`AppStateHolder`）と同じ受け取り方に揃えてある。
+
+```
+ViewModel.init
+  └─ ObserveXxxUseCase().filterNotNull().collect { dispatch(XxxChanged(it)) }
+
+ViewModel.handle(Started)
+  └─ RefreshXxxUseCase() ─▶ API ─▶ リポジトリの MutableStateFlow に入る ─▶ 上の collect に流れる
+       失敗したときだけ dispatch(LoadFailed)
+```
+
+- **まだ一度も取れていない間は `null`。** 「まだ取っていない空」と「取ったら空だった」を分けるため。
+  ViewModel は `null` を捨て、State は「一度でも受け取れたか」のフラグを持つ。
+- **読み込み中は、そのフラグから決める**（`isLoading = !受け取り済み && !失敗`）。
+  「取り直しが終わったら読み込み中を解く」を Intent で待つと、`StateFlow` は同じ値を
+  入れ直しても流れないので、取り直した結果が前と同じだったときに止まる。
+- **リポジトリは `@Singleton` なので前回の値が残る。** 画面を開き直すと、取り直しを待たずに
+  前回の一覧がまず出て、取り直しが終われば差し替わる（スリープ画面は入るたびに ViewModel が
+  作り直されるが、通知はすぐ出る）。取り直しに失敗しても、受け取り済みの一覧は出したままにする。
+- 取り直しのきっかけは今までどおり、画面を開いたときと消去したとき。定期的な取り直しはしていない。
+
 ### スリープ画面の通知一覧
 
 時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
@@ -292,11 +318,12 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 
 | 出どころ | 経路 | 持ち主 | 画面への届き方 |
 | --- | --- | --- | --- |
-| HTTP の API | `NoticeRepository` | `SleepState.apiNotices`（リポジトリは持たない） | 取りに行った結果を `NoticesLoaded` で |
+| HTTP の API | `NoticeRepository` | `NoticeRepository.notices` | 購読して、取り直されるたびに `ApiNoticesChanged` で |
 | 機器（TCP の `NOTICE` 行） | `DeviceRepositoryImpl` → `AppStateHolder` | `AppStateHolder.deviceNotices` | 購読して、届くたびに `DeviceNoticesChanged` で |
 
 ```
 SleepViewModel.init
+  ├─ ObserveNoticesUseCase().filterNotNull().collect { dispatch(ApiNoticesChanged(it)) }
   └─ ObserveDeviceNoticesUseCase().collect { dispatch(DeviceNoticesChanged(it)) }
 
 SleepState
@@ -314,21 +341,22 @@ SleepState
 API の通知と一覧の key が重ならないようにしている。新しいものを先頭に 20 件まで持つ。
 mock flavor では `fakeEvents()` が起動直後に 1 件、以降 20 秒ごとに 1 件流す。
 
-API は取得と消去の 2 本。UseCase もそれに 1 対 1 で対応する。
+API は取得と消去の 2 本。
 
 ```
-SleepIntent.Started          ─▶ GetNoticesUseCase   ─▶ GET    /notices
-SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notices
-                                                        ├▶ 機器からの通知を手元から消す
-                                                        └▶ GET /notices（取り直し）
-                                    どちらも結果は SleepIntent.NoticesLoaded として戻る
+SleepIntent.Started             ─▶ RefreshNoticesUseCase ─▶ GET    /notices
+SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase   ─▶ DELETE /notices
+                                                          ├▶ 機器からの通知を手元から消す
+                                                          └▶ GET /notices（取り直し）
+                  どちらも結果は NoticeRepository.notices に入り、ApiNoticesChanged として流れる
+                  失敗したときだけ NoticesLoadFailed を戻す
 ```
 
 消去が取り直しまで行うのは、消している間に届いた通知を落とさないため。
-呼び出し側から見れば「消した結果の一覧」が返るだけで、API が 2 本であることを知らずに済む。
-取得も消去も同じ Intent に戻るので、画面の経路は 1 本のままになる。
+呼び出し側は、API が 2 本であることを知らずに済む。
+取得も消去も同じ StateFlow に戻るので、画面の経路は 1 本のままになる。
 
-スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
+スリープに入るたびに ViewModel ごと作り直されるので、取り直しもそのたびに走る。
 失敗しても明示的な再試行ボタンは置いていない（次にスリープへ入れば取り直す）。
 
 **API はまだサーバ側が無い。** `NoticeRepositoryImpl` が仮データを返しており、
