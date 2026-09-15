@@ -23,4 +23,10 @@ object AppModule {
     @ApplicationScope
     fun provideApplicationScope(): CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    @MainThreadScope
+    fun provideMainThreadScope(): CoroutineScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 }

@@ -1,7 +1,7 @@
 package com.example.androidsampleapp.ui.navigation
 
 import com.example.androidsampleapp.config.AppConfig
-import com.example.androidsampleapp.di.ApplicationScope
+import com.example.androidsampleapp.di.MainThreadScope
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -31,11 +31,13 @@ import kotlinx.coroutines.launch
  * 画面遷移そのものは行わない。[isSleeping] を見た [AppNavigation] が遷移する。
  *
  * 呼び出しはすべてメインスレッドから来る前提（UI のイベントと Application の受信）。
+ * タイマーも同じくメインスレッドで動かす（[MainThreadScope]）。別スレッドで動かすと、
+ * タイマーの完了と [resetTimer] などの呼び出しが食い違い、状態が壊れることがある。
  */
 @Singleton
 class IdleTimer @Inject constructor(
     private val config: AppConfig,
-    @ApplicationScope private val scope: CoroutineScope,
+    @MainThreadScope private val scope: CoroutineScope,
 ) {
 
     private val _isSleeping = MutableStateFlow(false)

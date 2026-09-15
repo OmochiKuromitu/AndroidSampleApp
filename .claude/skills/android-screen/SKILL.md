@@ -304,6 +304,11 @@ Reducer と `MessageParser` は Android に依存しない純粋な処理なの�
 
 ## 踏んだ罠（同じことを繰り返さない）
 
+- **常駐クラスでどのスレッドで動かすかを、クラスの中に書かない。** `scope.launch(Dispatchers.Main)` と書くと、
+  テストで `backgroundScope` を渡しても仮想時間が効かず、JVM テストでは Main が無くて落ちる。
+  スレッドは注入するスコープで決める（UI と同じ状態を触るなら `@MainThreadScope`、そうでなければ `@ApplicationScope`）。
+  過去に `IdleTimer` を `@ApplicationScope`（Default）で動かし、UI スレッドからの呼び出しと状態を取り合っていた。
+
 - **`LaunchedEffect` の中から親のコールバックを直接呼ばない。** `LaunchedEffect(viewModel)` の中身は
   最初に起動したときのまま動き続けるので、親が新しいラムダを渡しても古いほうが呼ばれる。
   `val current by rememberUpdatedState(onXxx)` を挟んで `current()` を呼ぶ（`SleepRoute` が見本）。
