@@ -133,12 +133,16 @@ class DeviceRepositoryImpl @Inject constructor(
         delay(FAKE_CALL_DELAY_MS)
         emit(TcpClient.Event.Line("CALL|101|玄関"))
         var pings = 0
+        var sentNotices = 0
         while (currentCoroutineContext().isActive) {
             delay(FAKE_PING_INTERVAL_MS)
             emit(TcpClient.Event.Line("PONG"))
             // 画面を開いたまま一覧が増えるのを確認できるよう、ときどき通知を流す。
-            if (++pings % FAKE_NOTICE_EVERY_PINGS == 0) {
-                emit(TcpClient.Event.Line("NOTICE|INFO||機器からのテスト通知です（$pings）|TOP"))
+            // 上限に届いたら通知だけ止める。流れ自体を終わらせると切断とみなされ、
+            // monitor() が繋ぎ直して最初から流し直してしまうので、PONG は送り続ける。
+            if (++pings % FAKE_NOTICE_EVERY_PINGS == 0 && sentNotices < FAKE_NOTICE_LIMIT) {
+                sentNotices++
+                emit(TcpClient.Event.Line("NOTICE|INFO||機器からのテスト通知です（$sentNotices）|TOP"))
             }
         }
     }
@@ -147,6 +151,9 @@ class DeviceRepositoryImpl @Inject constructor(
         const val FAKE_CALL_DELAY_MS = 8_000L
         const val FAKE_PING_INTERVAL_MS = 5_000L
         const val FAKE_NOTICE_EVERY_PINGS = 4
+
+        /** テスト通知を流す回数。これを超えたら流さない（アプリを起動し直すと数え直す）。 */
+        const val FAKE_NOTICE_LIMIT = 20
 
         /** 手元に持つ機器からの通知の上限。超えたら古いものから捨てる。 */
         const val MAX_DEVICE_NOTICES = 20
