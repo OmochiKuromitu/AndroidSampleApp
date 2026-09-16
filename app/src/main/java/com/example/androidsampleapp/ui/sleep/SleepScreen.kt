@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +52,8 @@ fun SleepScreen(
     state: SleepState,
     onNoticeClick: (Notice) -> Unit,
     onClearNoticesClick: () -> Unit,
+    onClearNoticesConfirm: () -> Unit,
+    onClearNoticesDismiss: () -> Unit,
     onUnlockDrag: (Float) -> Unit,
     onUnlockCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -116,6 +120,33 @@ fun SleepScreen(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+
+    if (state.isClearConfirmVisible) {
+        ClearConfirmDialog(onConfirm = onClearNoticesConfirm, onDismiss = onClearNoticesDismiss)
+    }
+}
+
+/**
+ * 全消去の確認。消したものは戻せないので、押し間違いをここで止める。
+ *
+ * 出すかどうかは [SleepState.isClearConfirmVisible] が持つ。ダイアログ自身は状態を持たない。
+ */
+@Composable
+private fun ClearConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.notice_clear_confirm_title)) },
+        text = { Text(stringResource(R.string.notice_clear_confirm_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.dialog_yes)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_no)) }
+        },
+    )
 }
 
 /**
@@ -225,6 +256,8 @@ private fun SleepScreenPreview() {
             ),
             onNoticeClick = {},
             onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
             onUnlockDrag = {},
             onUnlockCancel = {},
         )
@@ -239,6 +272,8 @@ private fun SleepScreenEmptyPreview() {
             state = SleepState(timeText = "21:47", dateText = "9月10日 (水)", isApiNoticesLoaded = true),
             onNoticeClick = {},
             onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
             onUnlockDrag = {},
             onUnlockCancel = {},
         )
@@ -257,6 +292,29 @@ private fun SleepScreenLoadFailedPreview() {
             ),
             onNoticeClick = {},
             onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
+            onUnlockDrag = {},
+            onUnlockCancel = {},
+        )
+    }
+}
+
+@PanelPreview
+@Composable
+private fun SleepScreenClearConfirmPreview() {
+    PreviewSurface {
+        SleepScreen(
+            state = SleepState(
+                timeText = "21:47",
+                dateText = "9月10日 (水)",
+                apiNotices = previewNotices,
+                isClearConfirmVisible = true,
+            ),
+            onNoticeClick = {},
+            onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
             onUnlockDrag = {},
             onUnlockCancel = {},
         )
@@ -277,6 +335,8 @@ private fun SleepScreenSwipingPreview() {
             ),
             onNoticeClick = {},
             onClearNoticesClick = {},
+            onClearNoticesConfirm = {},
+            onClearNoticesDismiss = {},
             onUnlockDrag = {},
             onUnlockCancel = {},
         )

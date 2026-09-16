@@ -28,8 +28,14 @@ sealed interface SleepIntent : UiIntent {
     /** 機器から届いた通知の変化。スリープ中でも届くたびに流れる。 */
     data class DeviceNoticesChanged(val notices: List<Notice>) : SleepIntent
 
-    /** 消去ボタンを押した。API の通知と機器から届いた通知の両方を消して取り直す。 */
+    /** 消去ボタンを押した。まだ消さず、確認ダイアログを出す。 */
     data object ClearNoticesClicked : SleepIntent
+
+    /** 確認ダイアログで「はい」を押した。API の通知と機器から届いた通知の両方を消して取り直す。 */
+    data object ClearNoticesConfirmed : SleepIntent
+
+    /** 確認ダイアログを閉じた（「いいえ」、または外側をタップ）。何も消さない。 */
+    data object ClearNoticesDismissed : SleepIntent
 
     /** 通知をタップした。飛び先への遷移は Effect で AppNavigation に伝える。 */
     data class NoticeClicked(val notice: Notice) : SleepIntent

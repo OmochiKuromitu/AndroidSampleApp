@@ -33,14 +33,45 @@ class SleepReducerTest {
     }
 
     @Test
-    fun `受け取り済みなら消去を押しても読み込み中にしない`() {
-        // 取り直しの間も今の一覧を出したままにする。
-        val state = SleepState(apiNotices = notices, isApiNoticesLoaded = true, noticeLoadFailed = true)
+    fun `消去を押した時点では確認ダイアログを出すだけで消さない`() {
+        val state = SleepState(apiNotices = notices, isApiNoticesLoaded = true)
 
         val next = reducer.reduce(state, SleepIntent.ClearNoticesClicked)
 
+        assertTrue(next.isClearConfirmVisible)
         assertFalse(next.isLoadingNotices)
+        assertEquals(notices, next.notices)
+    }
+
+    @Test
+    fun `はいを押したらダイアログを閉じて前回の失敗も消す`() {
+        // 取り直しの間も、受け取り済みの一覧は出したままにする。
+        val state = SleepState(
+            apiNotices = notices,
+            isApiNoticesLoaded = true,
+            isClearConfirmVisible = true,
+            noticeLoadFailed = true,
+        )
+
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesConfirmed)
+
+        assertFalse(next.isClearConfirmVisible)
         assertFalse(next.noticeLoadFailed)
+        assertEquals(notices, next.notices)
+    }
+
+    @Test
+    fun `いいえで閉じたら何も起きない`() {
+        val state = SleepState(
+            apiNotices = notices,
+            isApiNoticesLoaded = true,
+            isClearConfirmVisible = true,
+        )
+
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesDismissed)
+
+        assertFalse(next.isClearConfirmVisible)
+        assertFalse(next.isLoadingNotices)
         assertEquals(notices, next.notices)
     }
 

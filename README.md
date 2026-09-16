@@ -341,6 +341,8 @@ ViewModel.handle(Started)
 ### スリープ画面の通知一覧
 
 時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
+消去は押した時点では消さず、「通知をすべて消しますか？」の確認ダイアログを 1 度出す。
+消したものは戻せないので、押し間違いをここで止める。出しているかどうかは `SleepState.isClearConfirmVisible`。
 
 1 件ずつ白いカードで出し、1 行目に「種別・タイトル・時刻」、2 行目に詳細を置く。
 **警報（`ALERT`）は上にまとめ、それ以外との間に線を引く。** 並べ替えは表示の都合なので
@@ -377,10 +379,11 @@ mock flavor では `fakeEvents()` が起動直後に 1 件、以降 20 秒ごと
 API は取得と消去の 2 本。
 
 ```
-SleepIntent.Started             ─▶ RefreshNoticesUseCase ─▶ GET    /notices
-SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase   ─▶ DELETE /notices
-                                                          ├▶ 機器からの通知を手元から消す
-                                                          └▶ GET /notices（取り直し）
+SleepIntent.Started               ─▶ RefreshNoticesUseCase ─▶ GET    /notices
+SleepIntent.ClearNoticesClicked   ─▶ 確認ダイアログを出すだけ（まだ消さない）
+SleepIntent.ClearNoticesConfirmed ─▶ ClearNoticesUseCase   ─▶ DELETE /notices
+                                                            ├▶ 機器からの通知を手元から消す
+                                                            └▶ GET /notices（取り直し）
                   どちらも結果は NoticeRepository.notices に入り、ApiNoticesChanged として流れる
                   失敗したときだけ NoticesLoadFailed を戻す
 ```

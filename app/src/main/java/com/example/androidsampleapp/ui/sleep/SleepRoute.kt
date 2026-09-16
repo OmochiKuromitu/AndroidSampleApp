@@ -44,6 +44,8 @@ fun SleepRoute(
         state = state,
         onNoticeClick = { viewModel.onIntent(SleepIntent.NoticeClicked(it)) },
         onClearNoticesClick = { viewModel.onIntent(SleepIntent.ClearNoticesClicked) },
+        onClearNoticesConfirm = { viewModel.onIntent(SleepIntent.ClearNoticesConfirmed) },
+        onClearNoticesDismiss = { viewModel.onIntent(SleepIntent.ClearNoticesDismissed) },
         onUnlockDrag = { viewModel.onIntent(SleepIntent.UnlockDragged(it)) },
         onUnlockCancel = { viewModel.onIntent(SleepIntent.UnlockCancelled) },
         modifier = modifier,

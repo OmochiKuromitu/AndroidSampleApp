@@ -25,6 +25,8 @@ data class SleepState(
     val deviceNotices: List<Notice> = emptyList(),
     /** 直近の API の取得（または消去）に失敗した。受け取り済みの一覧があればそれを出したままにする。 */
     val noticeLoadFailed: Boolean = false,
+    /** 全消去の確認ダイアログを出しているか。誤操作で消さないよう、1 度だけ確かめる。 */
+    val isClearConfirmVisible: Boolean = false,
     /**
      * 解除スワイプの進み具合。0f = 触っていない、1f = 解除に必要な距離に到達。
      * 指の動きに合わせて手応えを返すために状態として持つ。
