@@ -28,11 +28,36 @@ class SleepReducerTest {
     }
 
     @Test
-    fun `消去を押したときも取得中になる`() {
-        // 消去は取り直しまで含む 1 つの操作なので、取得と同じ扱いにする。
-        val next = reducer.reduce(SleepState(), SleepIntent.ClearNoticesClicked)
+    fun `消去を押した時点では確認ダイアログを出すだけで消さない`() {
+        val next = reducer.reduce(SleepState(apiNotices = notices), SleepIntent.ClearNoticesClicked)
 
+        assertTrue(next.isClearConfirmVisible)
+        assertFalse(next.isLoadingNotices)
+        assertEquals(notices, next.notices)
+    }
+
+    @Test
+    fun `はいを押したらダイアログを閉じて取得中になる`() {
+        // 消去は取り直しまで含む 1 つの操作なので、取得と同じ扱いにする。
+        val next = reducer.reduce(
+            SleepState(isClearConfirmVisible = true, noticeLoadFailed = true),
+            SleepIntent.ClearNoticesConfirmed,
+        )
+
+        assertFalse(next.isClearConfirmVisible)
         assertTrue(next.isLoadingNotices)
+        assertFalse(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `いいえで閉じたら何も起きない`() {
+        val state = SleepState(apiNotices = notices, isClearConfirmVisible = true)
+
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesDismissed)
+
+        assertFalse(next.isClearConfirmVisible)
+        assertFalse(next.isLoadingNotices)
+        assertEquals(notices, next.notices)
     }
 
     @Test

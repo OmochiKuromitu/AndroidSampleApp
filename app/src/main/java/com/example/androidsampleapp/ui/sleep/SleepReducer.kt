@@ -9,10 +9,19 @@ import com.example.androidsampleapp.core.mvi.Reducer
  */
 class SleepReducer : Reducer<SleepState, SleepIntent> {
     override fun reduce(state: SleepState, intent: SleepIntent): SleepState = when (intent) {
+        SleepIntent.Started -> state.copy(isLoadingNotices = true, noticeLoadFailed = false)
+
+        // 押しただけでは消さない。確認してから。
+        SleepIntent.ClearNoticesClicked -> state.copy(isClearConfirmVisible = true)
+
         // 消去も取り直しを伴うので、取得と同じく読み込み中にする。
-        SleepIntent.Started,
-        SleepIntent.ClearNoticesClicked,
-        -> state.copy(isLoadingNotices = true, noticeLoadFailed = false)
+        SleepIntent.ClearNoticesConfirmed -> state.copy(
+            isClearConfirmVisible = false,
+            isLoadingNotices = true,
+            noticeLoadFailed = false,
+        )
+
+        SleepIntent.ClearNoticesDismissed -> state.copy(isClearConfirmVisible = false)
 
         is SleepIntent.NoticesLoaded -> state.copy(
             apiNotices = intent.notices,

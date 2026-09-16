@@ -85,7 +85,8 @@ class SleepViewModel @Inject constructor(
             SleepIntent.Started -> load { getNotices() }
 
             // 消去は「消して取り直す」までが 1 つの操作。結果は取得と同じ経路で戻る。
-            SleepIntent.ClearNoticesClicked -> load { clearNotices() }
+            // 押しただけの ClearNoticesClicked では消さない（確認ダイアログを出すだけ）。
+            SleepIntent.ClearNoticesConfirmed -> load { clearNotices() }
 
             // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
             is SleepIntent.UnlockDragged ->
@@ -96,6 +97,8 @@ class SleepViewModel @Inject constructor(
             is SleepIntent.NoticeClicked ->
                 _effect.send(SleepEffect.NoticeSelected(intent.notice.destination))
 
+            SleepIntent.ClearNoticesClicked,
+            SleepIntent.ClearNoticesDismissed,
             SleepIntent.UnlockCancelled,
             is SleepIntent.NoticesLoaded,
             SleepIntent.NoticesLoadFailed,
