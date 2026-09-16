@@ -300,6 +300,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 | --- | --- | --- |
 | 受け付ける帯の高さ | 50dp | `Dimensions.unlockAreaHeight` |
 | 解除に必要な移動量 | 120dp | `Dimensions.unlockDistance` |
+| ヒントのバーの大きさ | 108×4dp | `Dimensions.unlockHintWidth` / `unlockHintHeight` |
 
 帯より移動量が大きいのは矛盾ではない。ドラッグは始まった位置で受け付けが決まり、
 その後は帯の外へ出ても追跡が続く。帯は「どこから始めたら解除操作とみなすか」だけを決める。

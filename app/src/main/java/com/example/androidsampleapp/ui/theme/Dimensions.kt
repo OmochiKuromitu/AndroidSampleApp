@@ -29,6 +29,9 @@ data class Dimensions(
     val unlockAreaHeight: Dp = 50.dp,
     /** 解除に必要な上方向の移動量。これを超えたら解除する。 */
     val unlockDistance: Dp = 120.dp,
+    /** 解除エリアに出す横バー。OS のホームバーに似せて、掴む場所だと分かるようにする。 */
+    val unlockHintWidth: Dp = 108.dp,
+    val unlockHintHeight: Dp = 4.dp,
 )
 
 val LocalDimensions = staticCompositionLocalOf { Dimensions() }

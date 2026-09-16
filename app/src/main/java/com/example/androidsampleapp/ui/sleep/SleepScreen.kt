@@ -2,19 +2,16 @@ package com.example.androidsampleapp.ui.sleep
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -192,25 +189,17 @@ private fun UnlockArea(
 /** 指の動きに合わせて少し持ち上がり、濃くなる。反応していることを見せるためだけの表示。 */
 @Composable
 private fun UnlockHint(progress: Float, travel: Dp) {
-    // 帯が低いので横並びにする。指に追従して帯の外へはみ出すが、親は切り取らない。
-    Row(
+    val dimensions = MaterialTheme.dimensions
+
+    // OS のホームバーに似せた横バー。指に追従して帯の外へはみ出すが、親は切り取らない。
+    // 角丸は CircleShape（短い辺の 50%）なので、太さを変えても端は丸いまま。
+    Box(
         modifier = Modifier
             .offset(y = -(travel * progress * HINT_FOLLOW_RATIO))
-            .alpha(HINT_MIN_ALPHA + (1f - HINT_MIN_ALPHA) * progress),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.dimensions.spaceSmall),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowUp,
-            contentDescription = null,
-            tint = Color.White,
-        )
-        Text(
-            text = stringResource(R.string.sleep_unlock_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White,
-        )
-    }
+            .alpha(HINT_MIN_ALPHA + (1f - HINT_MIN_ALPHA) * progress)
+            .size(width = dimensions.unlockHintWidth, height = dimensions.unlockHintHeight)
+            .background(color = Color.White, shape = CircleShape),
+    )
 }
 
 /** ヒントは指の移動量そのままではなく、控えめに追従させる。 */
