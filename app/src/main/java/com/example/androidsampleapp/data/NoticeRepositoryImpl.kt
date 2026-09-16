@@ -6,10 +6,16 @@ import com.example.androidsampleapp.model.NoticeResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 通知は HTTP の API から取る。機器との TCP とは経路が別なので、
  * AppStateHolder（機器から降ってくる状態）は通らない。
+ *
+ * 取った結果は [notices] に持つ。@Singleton なので、スリープに入り直しても前回の一覧がすぐ出て、
+ * 取り直しが終われば差し替わる。
  *
  * サーバ側が未実装のため、今は [fakeServerNotices] が「サーバが持っているはずのデータ」を
  * 肩代わりしている。API ができたらこのフィールドごと消す。
@@ -20,10 +26,13 @@ class NoticeRepositoryImpl @Inject constructor() : NoticeRepository {
     /** TODO: API ができたら削除する。本来はサーバが持つデータ。 */
     private var fakeServerNotices: List<NoticeResponse> = FAKE_RESPONSE
 
-    override suspend fun getNotices(): List<Notice> {
+    private val _notices = MutableStateFlow<List<Notice>?>(null)
+    override val notices: StateFlow<List<Notice>?> = _notices.asStateFlow()
+
+    override suspend fun refreshNotices() {
         // TODO: GET {AppConfig.apiBaseUrl}/notices に置き換える。
         delay(API_DELAY_MS)
-        return fakeServerNotices.map { it.toDomain() }
+        _notices.value = fakeServerNotices.map { it.toDomain() }
     }
 
     override suspend fun deleteAllNotices() {

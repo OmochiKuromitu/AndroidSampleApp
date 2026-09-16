@@ -71,7 +71,8 @@ fun ContactScreen(
         when {
             state.isLoading -> LoadingBox()
 
-            state.loadFailed -> CenteredMessage(
+            // 受け取り済みの一覧があるなら、取り直しに失敗してもそれを出したままにする。
+            state.loadFailed && !state.isAddressBookLoaded -> CenteredMessage(
                 message = stringResource(R.string.contact_load_failed),
                 color = MaterialTheme.colorScheme.error,
             )
@@ -161,6 +162,7 @@ private fun ContactScreenPhonebookPreview() {
                 selectedList = ContactList.PHONEBOOK,
                 contacts = previewContacts,
                 histories = previewHistories,
+                isAddressBookLoaded = true,
                 missedCallCount = 2,
             ),
             onListSelect = {},
@@ -177,6 +179,7 @@ private fun ContactScreenHistoryPreview() {
                 selectedList = ContactList.HISTORY,
                 contacts = previewContacts,
                 histories = previewHistories,
+                isAddressBookLoaded = true,
                 missedCallCount = 2,
             ),
             onListSelect = {},

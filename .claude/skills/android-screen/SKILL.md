@@ -259,8 +259,15 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
 
 - **機器から来る** — `network/MessageParser` に解釈を足し、`model/DeviceMessage` に型を足し、
   `data/DeviceRepositoryImpl` が `AppStateHolder` に反映する。
-- **API から来る** — `model/` にレスポンス型、`data/` のリポジトリが自分で保持して
-  `toDomain()` で変換。`AppStateHolder` は通さない。`data/NoticeRepositoryImpl` が見本。
+- **API から来る** — `model/` にレスポンス型、`data/` のリポジトリが `toDomain()` で変換し、
+  結果を `MutableStateFlow` に持って `StateFlow` で公開する（まだ取れていなければ `null`）。
+  取り直しは `suspend fun refreshXxx()` で、失敗したら例外を投げて前回の値を残す。
+  `AppStateHolder` は通さない。`data/NoticeRepositoryImpl` が見本。
+  - ViewModel は `init` で `filterNotNull().collect` して Intent にし、取り直しは `handle` から呼んで
+    **失敗したときだけ** Intent で戻す。成功した結果は購読側に流れる。
+  - State は「一度でも受け取れたか」のフラグを持ち、読み込み中はそこから決める
+    （`ContactState.isLoading` が見本）。取り直しの完了を Intent で待つと、`StateFlow` は
+    同じ値を入れ直しても流れないので、結果が前と同じだったときに読み込み中のまま止まる。
 - **サーバや機器の文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
   domain の `companion object` に `fromCode` を書かない。domain が通信の言葉を知ると、
   形式が変わったときに domain まで直すことになる。送る向き（`AirconMode.toCode()`）も同じ場所。
@@ -276,14 +283,14 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
 **呼び出し側から見た 1 つの操作に対して 1 つ。** リポジトリのメソッドを 1 対 1 で
 包み直すために作らない。
 
-- よい: `ClearNoticesUseCase` は消去 API を呼んでから取得 API を呼び、新しい一覧を返す。
-  呼び出し側は「消した結果の一覧が返る」とだけ知っていればよく、API が 2 本であることを知らない。
-- 避ける: `RefreshNoticesUseCase`（取りに行く）と `ObserveNoticesUseCase`（結果を見る）に
-  分ける。同じ 1 つの関心事が 2 つに割れて、ViewModel が両方を注入する羽目になる。
+- よい: `ClearNoticesUseCase` は消去 API、機器側の消去、取り直しを 1 つの操作にまとめる。
+  呼び出し側は API が 2 本であることを知らない。
+- よい: `RefreshAddressBookUseCase` は電話帳と履歴の 2 本の API をまとめて取り直す。
+- 避ける: リポジトリのメソッドを 1 つずつ包んだだけの UseCase を、画面の操作と関係なく並べる。
 
-ViewModel が 3 つ以上 UseCase を注いでいたら、割りすぎを疑う。
-なお `ObserveXxxUseCase` のように `StateFlow` を素通しするだけのものは、
-機器の共有状態（接続、着信、エアコン）のように複数画面が同じものを見る場合に限る。
+データを StateFlow で受け取る形なので、1 つの関心事につき「見る」（`ObserveXxxUseCase`、
+`StateFlow` の素通し）と「取り直す」（`RefreshXxxUseCase`）の 2 つになるのは想定どおり。
+それ以上に割れていたら、まとめられないか疑う。
 
 flavor で変わる値（接続先、タイムアウト、API のベース URL）は
 `app/build.gradle.kts` の `buildConfigField` と `config/AppConfig` に置く。

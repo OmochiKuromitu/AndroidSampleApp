@@ -6,17 +6,22 @@ import com.example.androidsampleapp.domain.model.Notice
 /**
  * スリープ画面の状態を変えうる入力の一覧。
  *
- * 時計の更新、通知の取得結果、機器から届く通知、解除スワイプまで、すべてここから Reducer に通す。
+ * 時計の更新、NoticeRepository の通知の変化、取得の失敗、機器から届く通知、解除スワイプまで、
+ * すべてここから Reducer に通す。
  */
 sealed interface SleepIntent : UiIntent {
-    /** 画面の生成時に 1 度だけ流す。ここで通知を取りに行く。 */
+    /** 画面の生成時に 1 度だけ流す。ここで API の通知を取り直す。 */
     data object Started : SleepIntent
 
     /** 時計の更新。ViewModel が 1 秒ごとに、整形済みの文字列で投げる。 */
     data class Ticked(val timeText: String, val dateText: String) : SleepIntent
 
-    /** 取得の結果。消去の結果もここに戻る（消去は取り直しを伴うため）。 */
-    data class NoticesLoaded(val notices: List<Notice>) : SleepIntent
+    /**
+     * API の通知が変わった。ViewModel が NoticeRepository を購読して、値が流れるたびに投げる。
+     * 取り直しや消去の結果もここに戻る。前回の値があれば、取り直しを待たずにまずそれが流れる。
+     */
+    data class ApiNoticesChanged(val notices: List<Notice>) : SleepIntent
+
     /** 取得（または消去）に失敗した。前回の一覧は残す。 */
     data object NoticesLoadFailed : SleepIntent
 

@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.core.MissedCallManager
-import com.example.androidsampleapp.domain.usecase.GetCallHistoriesUseCase
-import com.example.androidsampleapp.domain.usecase.GetContactsUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveAddressBookUseCase
+import com.example.androidsampleapp.domain.usecase.RefreshAddressBookUseCase
 import com.example.androidsampleapp.ui.common.Route
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
@@ -20,15 +21,16 @@ import kotlinx.coroutines.launch
  * 連絡先画面の ViewModel。
  *
  * - 最初に開くリストは遷移の引数（SavedStateHandle）から、初期状態の時点で決める。
- * - 画面を開いたら電話帳と履歴をまとめて取る。
+ * - 電話帳と履歴は ContactRepository を購読し、値が変わるたびに Intent にする。
+ *   画面を開いたら取り直しを頼み、失敗したときだけ Intent で戻す（成功した結果は購読側に流れる）。
  * - 不在着信の件数は MissedCallManager を購読するだけで、履歴を見せたら既読を頼む。
  */
 @HiltViewModel
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val missedCallManager: MissedCallManager,
-    private val getContacts: GetContactsUseCase,
-    private val getCallHistories: GetCallHistoriesUseCase,
+    observeAddressBook: ObserveAddressBookUseCase,
+    private val refreshAddressBook: RefreshAddressBookUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -47,6 +49,12 @@ class ContactViewModel @Inject constructor(
     private val reducer = ContactReducer()
 
     init {
+        // まだ一度も取れていない間は null が流れる。読み込み中の表示は State が決めるので、ここでは捨てる。
+        viewModelScope.launch {
+            observeAddressBook().filterNotNull().collect {
+                onIntent(ContactIntent.AddressBookChanged(it))
+            }
+        }
         // 取得は MissedCallManager が行う。ここは件数を見るだけ。
         viewModelScope.launch {
             missedCallManager.missedCallCount.collect {
@@ -75,10 +83,10 @@ class ContactViewModel @Inject constructor(
 
     private suspend fun handle(intent: ContactIntent, previous: ContactState, current: ContactState) {
         when (intent) {
-            // 両方まとめて取る。リストの切り替えは表示の出し分けだけにして、
+            // 両方まとめて取り直す。リストの切り替えは表示の出し分けだけにして、
             // タブを触るたびに通信が走らないようにする。
             ContactIntent.Started -> {
-                load()
+                refresh()
                 // 履歴から開いたなら、その時点で見せたことになる。
                 if (current.selectedList == ContactList.HISTORY) missedCallManager.markAsRead()
             }
@@ -88,18 +96,16 @@ class ContactViewModel @Inject constructor(
             is ContactIntent.ListSelected ->
                 if (intent.list == ContactList.HISTORY) missedCallManager.markAsRead()
 
-            is ContactIntent.Loaded,
+            is ContactIntent.AddressBookChanged,
             ContactIntent.LoadFailed,
             is ContactIntent.MissedCallCountChanged,
             -> Unit
         }
     }
 
-    private suspend fun load() {
-        runCatching { getContacts() to getCallHistories() }
-            .onSuccess { (contacts, histories) ->
-                onIntent(ContactIntent.Loaded(contacts = contacts, histories = histories))
-            }
+    /** 成功した結果は ContactRepository の値の変化として購読側に届くので、ここは失敗だけを戻す。 */
+    private suspend fun refresh() {
+        runCatching { refreshAddressBook() }
             .onFailure { onIntent(ContactIntent.LoadFailed) }
     }
 }

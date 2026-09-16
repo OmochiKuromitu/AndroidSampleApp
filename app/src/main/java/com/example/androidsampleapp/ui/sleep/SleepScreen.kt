@@ -221,6 +221,7 @@ private fun SleepScreenPreview() {
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
                 apiNotices = previewNotices,
+                isApiNoticesLoaded = true,
             ),
             onNoticeClick = {},
             onClearNoticesClick = {},
@@ -235,7 +236,7 @@ private fun SleepScreenPreview() {
 private fun SleepScreenEmptyPreview() {
     PreviewSurface {
         SleepScreen(
-            state = SleepState(timeText = "21:47", dateText = "9月10日 (水)"),
+            state = SleepState(timeText = "21:47", dateText = "9月10日 (水)", isApiNoticesLoaded = true),
             onNoticeClick = {},
             onClearNoticesClick = {},
             onUnlockDrag = {},
@@ -271,6 +272,7 @@ private fun SleepScreenSwipingPreview() {
                 timeText = "21:47",
                 dateText = "9月10日 (水)",
                 apiNotices = previewNotices,
+                isApiNoticesLoaded = true,
                 unlockProgress = 0.7f,
             ),
             onNoticeClick = {},

@@ -20,7 +20,12 @@ class SleepReducerTest {
         Notice(id, NoticeCategory.CALL, null, "玄関から呼び出し", occurredAt, NoticeDestination.Top)
 
     @Test
-    fun `Started で通知の取得中になる`() {
+    fun `初めは API の通知を受け取るまで読み込み中`() {
+        assertTrue(SleepState().isLoadingNotices)
+    }
+
+    @Test
+    fun `Started で前回の失敗が消えて読み込み中に戻る`() {
         val next = reducer.reduce(SleepState(noticeLoadFailed = true), SleepIntent.Started)
 
         assertTrue(next.isLoadingNotices)
@@ -28,30 +33,29 @@ class SleepReducerTest {
     }
 
     @Test
-    fun `消去を押したときも取得中になる`() {
-        // 消去は取り直しまで含む 1 つの操作なので、取得と同じ扱いにする。
-        val next = reducer.reduce(SleepState(), SleepIntent.ClearNoticesClicked)
+    fun `受け取り済みなら消去を押しても読み込み中にしない`() {
+        // 取り直しの間も今の一覧を出したままにする。
+        val state = SleepState(apiNotices = notices, isApiNoticesLoaded = true, noticeLoadFailed = true)
 
-        assertTrue(next.isLoadingNotices)
+        val next = reducer.reduce(state, SleepIntent.ClearNoticesClicked)
+
+        assertFalse(next.isLoadingNotices)
+        assertFalse(next.noticeLoadFailed)
+        assertEquals(notices, next.notices)
     }
 
     @Test
-    fun `取得できた一覧が入る`() {
-        val next = reducer.reduce(
-            SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(notices),
-        )
+    fun `API の通知を受け取ったら一覧が入り読み込み中が解ける`() {
+        val next = reducer.reduce(SleepState(), SleepIntent.ApiNoticesChanged(notices))
 
         assertEquals(notices, next.notices)
         assertFalse(next.isLoadingNotices)
     }
 
     @Test
-    fun `消去後の空の一覧も同じ経路で入る`() {
-        val next = reducer.reduce(
-            SleepState(apiNotices = notices, isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(emptyList()),
-        )
+    fun `取ったら空だった場合も読み込み中が解ける`() {
+        // 「まだ取っていない空」と区別できないと、空のときに読み込み中のまま止まる。
+        val next = reducer.reduce(SleepState(), SleepIntent.ApiNoticesChanged(emptyList()))
 
         assertTrue(next.notices.isEmpty())
         assertFalse(next.isLoadingNotices)
@@ -71,8 +75,8 @@ class SleepReducerTest {
         val device = listOf(notice(id = "device-1", occurredAt = 200L))
 
         val next = reducer.reduce(
-            SleepState(deviceNotices = device, isLoadingNotices = true),
-            SleepIntent.NoticesLoaded(emptyList()),
+            SleepState(deviceNotices = device),
+            SleepIntent.ApiNoticesChanged(emptyList()),
         )
 
         assertEquals(device, next.notices)
@@ -99,13 +103,20 @@ class SleepReducerTest {
     }
 
     @Test
-    fun `取得に失敗したら取得中が解けて失敗が立つ`() {
-        val next = reducer.reduce(
-            SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesLoadFailed,
-        )
+    fun `取得に失敗したら読み込み中が解けて失敗が立つ`() {
+        val next = reducer.reduce(SleepState(), SleepIntent.NoticesLoadFailed)
 
         assertFalse(next.isLoadingNotices)
+        assertTrue(next.noticeLoadFailed)
+    }
+
+    @Test
+    fun `取得に失敗しても受け取り済みの一覧は残す`() {
+        val state = SleepState(apiNotices = notices, isApiNoticesLoaded = true)
+
+        val next = reducer.reduce(state, SleepIntent.NoticesLoadFailed)
+
+        assertEquals(notices, next.notices)
         assertTrue(next.noticeLoadFailed)
     }
 
