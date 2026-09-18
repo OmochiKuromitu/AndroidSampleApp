@@ -569,3 +569,62 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
   画面消灯の経路は `ACTION_SCREEN_OFF` で拾うのでこの影響を受けない。
 - プロセスが破棄されてからの再起動は、状態が初期値に戻るためスリープ画面から始まらない。
   それも必ずスリープにしたいなら、`IdleTimer` の `_isSleeping` の初期値を `true` にする。
+
+
+route例
+
+data object Main : Route {
+    // 既存の遷移で使うパス
+    override val path: String = "main"
+
+    // NavHost の登録で使うパターン
+    const val ROUTE =
+        "main?selectTab={selectTab}&contactTab={contactTab}"
+
+    fun createRoute(
+        selectTab: String? = null,
+        contactTab: String? = null,
+    ): String {
+        val query = listOfNotNull(
+            selectTab?.let { "selectTab=${Uri.encode(it)}" },
+            contactTab?.let { "contactTab=${Uri.encode(it)}" },
+        ).joinToString("&")
+
+        return if (query.isEmpty()) path else "$path?$query"
+    }
+}
+
+composable(
+    route = "main?selectTab={selectTab}&contactTab={contactTab}",
+    arguments = listOf(
+        navArgument("selectTab") {
+            type = NavType.StringType
+            nullable = true
+            defaultValue = null
+        },
+        navArgument("contactTab") {
+            type = NavType.StringType
+            nullable = true
+            defaultValue = null
+        },
+    ),
+) { entry ->
+    val selectTab = entry.arguments?.getString("selectTab")
+    val contactTab = entry.arguments?.getString("contactTab")
+
+    // "main" で遷移した場合、どちらも null
+}
+
+// 両方とも null
+nav.navigate(Route.Main.createRoute())
+
+// selectTab だけ指定
+nav.navigate(Route.Main.createRoute(selectTab = "top"))
+
+// 両方指定
+nav.navigate(
+    Route.Main.createRoute(
+        selectTab = "contact",
+        contactTab = "history",
+    )
+)

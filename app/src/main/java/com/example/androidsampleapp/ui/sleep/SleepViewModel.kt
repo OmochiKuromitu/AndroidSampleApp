@@ -46,8 +46,10 @@ class SleepViewModel @Inject constructor(
 
     private val reducer = SleepReducer()
 
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    private val dateFormat = SimpleDateFormat("M月d日 (E)", Locale.getDefault())
+    // ロケールは端末任せにしない。パターンに「月」「日」を直接書いているので、
+    // 端末が日本語以外だと曜日だけ "Wed" になって混ざる。壁付けパネルは日本向けに固定でよい。
+    private val timeFormat = SimpleDateFormat("H:mm:ss", Locale.JAPAN)
+    private val dateFormat = SimpleDateFormat("M月d日 (E)", Locale.JAPAN)
 
     init {
         // API の通知。まだ一度も取れていない間は null が流れる。読み込み中の表示は State が決めるので、ここでは捨てる。
@@ -63,7 +65,9 @@ class SleepViewModel @Inject constructor(
             while (isActive) {
                 val now = Date()
                 onIntent(SleepIntent.Ticked(timeFormat.format(now), dateFormat.format(now)))
-                delay(TICK_INTERVAL_MS)
+                // 秒を出すので、次の秒の頭に合わせて起こす。固定で 1 秒待つと整形と再開の分だけ
+                // 少しずつ後ろへずれて、表示上の秒が飛んだり同じ値が 2 回続いたりする。
+                delay(TICK_INTERVAL_MS - now.time % TICK_INTERVAL_MS)
             }
         }
         onIntent(SleepIntent.Started)
