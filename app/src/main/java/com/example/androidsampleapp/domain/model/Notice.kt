@@ -1,7 +1,7 @@
 package com.example.androidsampleapp.domain.model
 
 /**
- * 機器から受け取った通知。
+ * 一覧に出す通知。HTTP の API から取るものと、機器から TCP で届くものの 2 つの出どころがある。
  *
  * どの画面へ飛ぶかを通知自身が持つ。一覧側に「この分類ならここ」という
  * 対応表を書かずに済み、飛び先を増やすときも [NoticeDestination] だけで閉じる。
@@ -9,27 +9,33 @@ package com.example.androidsampleapp.domain.model
 data class Notice(
     val id: String,
     val category: NoticeCategory,
+    /** 種別の横に出す短い見出し。無い通知もある。 */
+    val title: String?,
+    /** 見出しの下に出す詳細。 */
     val message: String,
+    /**
+     * 起きた日時（epoch ミリ秒）。出どころの違う通知を混ぜて並べるので、表示用の文字列ではなく
+     * 比べられる値で持つ。整形は ui 層で行う。
+     */
+    val occurredAt: Long,
     val destination: NoticeDestination,
 )
 
-/** 通知の分類。一覧ではタグとして色分けして出す。 */
-enum class NoticeCategory(val label: String) {
-    CALL("来客"),
-    AIRCON("エアコン"),
-    ALERT("警報"),
-    INFO("お知らせ"),
-    ;
-
-    companion object {
-        fun fromCode(code: String): NoticeCategory =
-            entries.firstOrNull { it.name.equals(code, ignoreCase = true) } ?: INFO
-    }
+/**
+ * 通知の分類。一覧ではタグとして色分けして出す。
+ * サーバや機器の文字列との対応は data 層（data/CodeMapping）が、表示名は ui 層（ui/common/Labels）が持つ。
+ */
+enum class NoticeCategory {
+    CALL,
+    AIRCON,
+    ALERT,
+    INFO,
 }
 
 /**
  * 通知をタップしたときの飛び先。
- * ルート文字列との対応は ui 層が持ち、ドメインは画面の住所を知らない。
+ * ルート文字列との対応は ui 層が、サーバや機器の文字列との対応は data 層（data/CodeMapping）が持つ。
+ * ドメインは画面の住所も通信の言葉も知らない。
  *
  * enum ではなく sealed interface なのは、飛び先によって追加の情報を伴うものがあるため。
  */
@@ -45,13 +51,4 @@ sealed interface NoticeDestination {
      * ドメインは不在だったという事実だけを伝える。
      */
     data class Contact(val hasMissedCall: Boolean) : NoticeDestination
-
-    companion object {
-        fun fromCode(code: String): NoticeDestination = when (code.uppercase()) {
-            "AIRCON" -> Aircon
-            "CONTACT" -> Contact(hasMissedCall = false)
-            "CONTACT_MISSED" -> Contact(hasMissedCall = true)
-            else -> Top
-        }
-    }
 }

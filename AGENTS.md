@@ -41,7 +41,7 @@ flavor は `mock`（実機不要。擬似デバイスが接続・エアコン状
 ## このリポジトリで決めていること
 
 - 遷移を書くのは `ui/navigation/AppNavigation.kt` だけ。`NavController` を持つのもここだけ。
-- `XxxScreen` は表示だけ。ViewModel も Effect も知らない。配線は `XxxRoute`。
+- `XxxScreen` は表示だけ。ViewModel も Intent も Effect も知らない。配線は `XxxRoute`。
 - Reducer は `(State, Intent) -> State` の純粋関数。副作用は ViewModel の `handle()`。
 - 状態が変わる入口は Reducer だけ。通信結果も共有状態の変化も Intent に変換して通す。
 

@@ -18,6 +18,11 @@ val TagAircon = Color(0xFF2E8B77)
 val TagAlert = Color(0xFFC0453C)
 val TagInfo = Color(0xFF6B7280)
 
+// 通知のカード。スリープ画面の黒い背景に置くので、テーマに関係なく白地に濃い文字で描く。
+val NoticeCardBackground = Color.White
+val NoticeCardContent = Grey900
+val NoticeCardSubContent = Color(0xFF6B7280)
+
 internal val LightColors = lightColorScheme(
     primary = Teal700,
     secondary = Teal900,

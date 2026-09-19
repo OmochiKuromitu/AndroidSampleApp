@@ -1,7 +1,8 @@
 # AndroidSampleApp
 
-Jetpack Compose + MVI の Android アプリ。壁付けの操作パネルを想定していて、
-機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばスリープ画面に落ちる。
+Jetpack Compose + MVI の Android アプリ。自作のラズパイの壁付けの操作パネル利用していて、
+機器と TCP で常時つながり、操作は UDP で送る。無操作が続けばタブをスリープ画面にする。
+
 
 - 下部バーで 4 タブ（トップ / エアコン / 連絡先 / スリープ）
 - 画面遷移も含めて Intent → Reducer を通す
@@ -48,11 +49,11 @@ Android Studio でこのディレクトリを開く。実行構成は 4 つ（mo
      ┌──────────────── State ────────────────┐
      │                                        │
      ▼                                        │
- Composable ──dispatch(Intent)──▶ ViewModel ──┤
+ Composable ──onIntent(Intent)──▶ ViewModel ──┤
      ▲                               │        │
      │                               ├── Reducer(state, intent) -> state   純粋関数
      └────collect(Effect)────────────┘        │
-                             handle(...) ─────┘  UseCase 呼び出し・Effect 送出・追加 dispatch
+                             handle(...) ─────┘  UseCase 呼び出し・Effect 送出・追加 onIntent
 ```
 
 - **State** — 画面が描画に使う唯一の入力。不変の data class。
@@ -75,16 +76,18 @@ State と Effect を分けるのが要点。遷移を State に持たせると�
 | `XxxIntent.kt` | 入力の一覧。`UiIntent` を実装した sealed interface |
 | `XxxEffect.kt` | 一回きりの出来事。`UiEffect` を実装した sealed interface。遷移の命令は書かない |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
-| `XxxViewModel.kt` | `MviViewModel` を継承。`handle()` に副作用を隔離 |
+| `XxxViewModel.kt` | `ViewModel` を継承し、`_uiState` と `_effect` を自分で持つ。`handle()` に副作用を隔離 |
 | `XxxRoute.kt` | 配線。ViewModel の取得、State の購読、Effect の受け取り、`LaunchedEffect` |
-| `XxxScreen.kt` | 表示。State を描き、操作を Intent として返すだけ |
+| `XxxScreen.kt` | 表示。State を描き、操作をコールバックで返すだけ。Intent は知らない |
 
 **Route と Screen を分ける。**
 
 - `XxxRoute` — `AppNavigation` から呼ばれる入口。`hiltViewModel()` で ViewModel を取り、
   State を購読し、Effect を受けて呼び出し元のコールバックへ流す。`LaunchedEffect` もここ。
-- `XxxScreen` — `state` と `onIntent: (Intent) -> Unit` だけを受け取る。
-  ViewModel も Effect も知らない。
+  Screen から返ってきた操作を Intent に変えて `onIntent` に渡すのもここだけ。
+- `XxxScreen` — `state` と、操作ごとのコールバック（`onAnswerClick: () -> Unit`、
+  `onModeSelect: (AirconMode) -> Unit` など）だけを受け取る。
+  ViewModel も Intent も Effect も知らない。
 
 Screen を表示だけに保つのが目的。副作用の配線が混ざると、見た目を直すつもりで
 ライフサイクルの都合を読む羽目になる。プレビューの都合もある。`hiltViewModel()` は
@@ -98,7 +101,10 @@ private fun AirconScreenOfflinePreview() {
     PreviewSurface {
         AirconScreen(
             state = AirconState(connectionState = ConnectionState.DISCONNECTED),
-            onIntent = {},
+            onPowerToggle = {},
+            onTemperatureDownClick = {},
+            onTemperatureUpClick = {},
+            onModeSelect = {},
         )
     }
 }
@@ -112,9 +118,41 @@ private fun AirconScreenOfflinePreview() {
 現在は 4 画面に 10 個のプレビューがある（着信あり / 待機中、運転中 / 停止中 / 未接続、
 スリープ / スワイプ中、接続あり / 切断）。それぞれライトとダークで描かれる。
 
-土台は `core/mvi/` にある（`Mvi.kt` / `MviViewModel.kt` / `CollectEffect.kt`）。
-`MviViewModel` は Intent を 1 本のチャネルに集約し、到着順に reduce する。
-副作用だけは並行に走らせて、長い I/O が後続 Intent の reduce を止めないようにしている。
+土台は `core/mvi/Mvi.kt`（`UiState` / `UiIntent` / `UiEffect` / `Reducer`）だけ。ViewModel の基底クラスは置かず、
+各 ViewModel が同じ形を自分で書く。どの ViewModel を開いても、状態と Effect の持ち方が
+その場で読めるようにするため。
+
+```kotlin
+@HiltViewModel
+class XxxViewModel @Inject constructor(/* UseCase */) : ViewModel() {
+    private val _uiState = MutableStateFlow(XxxState())
+    val uiState: StateFlow<XxxState> = _uiState.asStateFlow()
+
+    private val _effect = Channel<XxxEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
+
+    private val reducer = XxxReducer()
+
+    init { /* 購読して onIntent に流す */ }
+
+    fun onIntent(intent: XxxIntent) {
+        // Reducer で次の状態を作って入れる。読んでから書くまでに別の更新が入ったらやり直す。
+        // そのあと handle(intent, previous, current) を並行に起動する。
+    }
+}
+```
+
+- **プロパティは `init` より上に書く。** Kotlin は上から順に初期化するので、`init` の中で
+  `onIntent` を呼んだときに `_uiState` や `reducer` がまだ無いと落ちる。
+- 副作用（`handle`）は並行に走らせる。長い I/O が、後から来た Intent の反映を止めないようにするため。
+
+Route は Effect を `LaunchedEffect(viewModel) { viewModel.effect.collect { ... } }` で受け取る。
+
+- 画面が裏に回っている間も受け取る。前面に戻るまで溜めることはしない
+  （壁付けでほぼ常に前面にいる前提。裏にいる間に出たスナックバーは、誰も見ないまま消えることがある）。
+- Effect は Channel なので、1 つの Effect は 1 回しか届かない。1 画面で `collect` するのは 1 か所だけにする。
+- 親から受け取ったコールバックを Effect で呼ぶときは `rememberUpdatedState` 越しに呼ぶ
+  （`SleepRoute` が見本）。`LaunchedEffect` の中身は最初に起動したときのまま動くため。
 
 ### 画面遷移の扱い
 
@@ -191,7 +229,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 
 ### 共有状態 — AppStateHolder
 
-接続状態・着信・エアコンの現在値は、全画面が見る。これを `core/AppStateHolder` が単独で持つ。
+接続状態・着信・エアコンの現在値と、機器から届いた通知は、`core/AppStateHolder` が単独で持つ。
 
 - **書き込むのは 1 か所だけ** — 受信を反映する `data/DeviceRepositoryImpl`。
 - 画面と ViewModel は読むだけ。UseCase 経由で `StateFlow` を受け取り、
@@ -262,6 +300,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 | --- | --- | --- |
 | 受け付ける帯の高さ | 50dp | `Dimensions.unlockAreaHeight` |
 | 解除に必要な移動量 | 120dp | `Dimensions.unlockDistance` |
+| ヒントのバーの大きさ | 108×4dp | `Dimensions.unlockHintWidth` / `unlockHintHeight` |
 
 帯より移動量が大きいのは矛盾ではない。ドラッグは始まった位置で受け付けが決まり、
 その後は帯の外へ出ても追跡が続く。帯は「どこから始めたら解除操作とみなすか」だけを決める。
@@ -274,28 +313,87 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 進み具合が 1.0 に達した瞬間の 1 回だけ `SleepEffect.Wake` を出す。
 指がさらに動いても重ねて送らない。
 
+### HTTP で取るデータ — リポジトリの StateFlow
+
+電話帳・履歴（`ContactRepository.addressBook`）と API の通知（`NoticeRepository.notices`）は、
+取った結果をリポジトリが `MutableStateFlow` で持ち、`StateFlow` で公開する。
+ViewModel は `init` で購読し、値が流れるたびに Intent にして Reducer に通す。
+機器から降ってくる状態（`AppStateHolder`）と同じ受け取り方に揃えてある。
+
+```
+ViewModel.init
+  └─ ObserveXxxUseCase().filterNotNull().collect { onIntent(XxxChanged(it)) }
+
+ViewModel.handle(Started)
+  └─ RefreshXxxUseCase() ─▶ API ─▶ リポジトリの MutableStateFlow に入る ─▶ 上の collect に流れる
+       失敗したときだけ onIntent(LoadFailed)
+```
+
+- **まだ一度も取れていない間は `null`。** 「まだ取っていない空」と「取ったら空だった」を分けるため。
+  ViewModel は `null` を捨て、State は「一度でも受け取れたか」のフラグを持つ。
+- **読み込み中は、そのフラグから決める**（`isLoading = !受け取り済み && !失敗`）。
+  「取り直しが終わったら読み込み中を解く」を Intent で待つと、`StateFlow` は同じ値を
+  入れ直しても流れないので、取り直した結果が前と同じだったときに止まる。
+- **リポジトリは `@Singleton` なので前回の値が残る。** 画面を開き直すと、取り直しを待たずに
+  前回の一覧がまず出て、取り直しが終われば差し替わる（スリープ画面は入るたびに ViewModel が
+  作り直されるが、通知はすぐ出る）。取り直しに失敗しても、受け取り済みの一覧は出したままにする。
+- 取り直しのきっかけは今までどおり、画面を開いたときと消去したとき。定期的な取り直しはしていない。
+
 ### スリープ画面の通知一覧
 
 時刻表示の下に、受け取った通知を出す。消去ボタンは一覧の右上に小さく置く。
+消去は押した時点では消さず、「通知をすべて消しますか？」の確認ダイアログを 1 度出す。
+消したものは戻せないので、押し間違いをここで止める。出しているかどうかは `SleepState.isClearConfirmVisible`。
 
-通知は **HTTP の API** から取る。機器との TCP とは経路が別なので、
-`AppStateHolder`（機器から降ってくる状態）は通らない。リポジトリも状態を持たず、
-保持するのは `SleepState` だけ。
+1 件ずつ白いカードで出し、1 行目に「種別・タイトル・時刻」、2 行目に詳細を置く。
+**警報（`ALERT`）は上にまとめ、それ以外との間に線を引く。** 並べ替えは表示の都合なので
+`ui/common/NoticeList` で行い、グループの中はサーバから来た順（新しいものが先頭）のまま。
 
-API は取得と消去の 2 本。UseCase もそれに 1 対 1 で対応する。
+通知の出どころは 2 つある。
+
+| 出どころ | 経路 | 持ち主 | 画面への届き方 |
+| --- | --- | --- | --- |
+| HTTP の API | `NoticeRepository` | `NoticeRepository.notices` | 購読して、取り直されるたびに `ApiNoticesChanged` で |
+| 機器（TCP の `NOTICE` 行） | `DeviceRepositoryImpl` → `AppStateHolder` | `AppStateHolder.deviceNotices` | 購読して、届くたびに `DeviceNoticesChanged` で |
 
 ```
-SleepIntent.Started          ─▶ GetNoticesUseCase   ─▶ GET    /notices
-SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notices
-                                                        └▶ GET /notices（取り直し）
-                                    どちらも結果は SleepIntent.NoticesLoaded として戻る
+SleepViewModel.init
+  ├─ ObserveNoticesUseCase().filterNotNull().collect { onIntent(ApiNoticesChanged(it)) }
+  └─ ObserveDeviceNoticesUseCase().collect { onIntent(DeviceNoticesChanged(it)) }
+
+SleepState
+  apiNotices ─┐
+              ├─▶ notices（新しい順に合わせたもの。一覧に出すのはこれ）
+  deviceNotices ┘
+```
+
+出どころ別に持つのは、API を取り直したときに機器からの分を消さないため（逆も同じ）。
+合わせて並べるので、`Notice.occurredAt` は表示用の文字列ではなく epoch ミリ秒で持ち、
+整形は `NoticeList` で行う（minSdk 24 なので `java.time` は使わない）。
+
+機器からの通知は仮置き。形式は `NOTICE|種別|タイトル|詳細|飛び先`（タイトルは空でよい）で、
+機器は id も時刻も送ってこない前提にしている。受け取った時刻を入れ、id には `device-` を付けて
+API の通知と一覧の key が重ならないようにしている。新しいものを先頭に 20 件まで持つ。
+mock flavor では `fakeEvents()` が起動直後に 1 件、以降 20 秒ごとに 1 件、テスト通知を 20 件まで流す。
+上限に届いても流れ自体は終わらせない（終わると切断とみなされ、繋ぎ直して最初から流し直すため）。
+
+API は取得と消去の 2 本。
+
+```
+SleepIntent.Started               ─▶ RefreshNoticesUseCase ─▶ GET    /notices
+SleepIntent.ClearNoticesClicked   ─▶ 確認ダイアログを出すだけ（まだ消さない）
+SleepIntent.ClearNoticesConfirmed ─▶ ClearNoticesUseCase   ─▶ DELETE /notices
+                                                            ├▶ 機器からの通知を手元から消す
+                                                            └▶ GET /notices（取り直し）
+                  どちらも結果は NoticeRepository.notices に入り、ApiNoticesChanged として流れる
+                  失敗したときだけ NoticesLoadFailed を戻す
 ```
 
 消去が取り直しまで行うのは、消している間に届いた通知を落とさないため。
-呼び出し側から見れば「消した結果の一覧」が返るだけで、API が 2 本であることを知らずに済む。
-取得も消去も同じ Intent に戻るので、画面の経路は 1 本のままになる。
+呼び出し側は、API が 2 本であることを知らずに済む。
+取得も消去も同じ StateFlow に戻るので、画面の経路は 1 本のままになる。
 
-スリープに入るたびに ViewModel ごと作り直されるので、取得もそのたびに走る。
+スリープに入るたびに ViewModel ごと作り直されるので、取り直しもそのたびに走る。
 失敗しても明示的な再試行ボタンは置いていない（次にスリープへ入れば取り直す）。
 
 **API はまだサーバ側が無い。** `NoticeRepositoryImpl` が仮データを返しており、
@@ -308,7 +406,9 @@ SleepIntent.ClearNoticesClicked ─▶ ClearNoticesUseCase ─▶ DELETE /notice
 data class Notice(
     val id: String,
     val category: NoticeCategory,   // CALL / AIRCON / ALERT / INFO。一覧ではタグとして色分け
-    val message: String,
+    val title: String?,             // 種別の横に出す見出し。無い通知もある
+    val message: String,            // 見出しの下に出す詳細
+    val occurredAt: Long,           // epoch ミリ秒。整形は ui 層
     val destination: NoticeDestination,   // TOP / AIRCON
 )
 ```
@@ -377,7 +477,7 @@ MonitoringService (前面サービス)
   └─ DeviceRepository.monitor()          再接続ループ。切れたら待って繋ぎ直す
        └─ TcpClient.connect(): Flow      1 行 = 1 メッセージ
             └─ MessageParser.parse()     文字列 -> DeviceMessage
-                 └─ AppStateHolder       接続状態・着信・エアコンを更新
+                 └─ AppStateHolder       接続状態・着信・エアコン・機器からの通知を更新
 
 操作: ViewModel -> UseCase -> Repository -> UdpCommandClient.send(CommandRequest)
       結果は TCP 側の通知で返ってくるので、送信時に楽観的な更新はしない
@@ -397,7 +497,7 @@ app/src/main/java/com/example/androidsampleapp/
 ├── MainActivity.kt
 ├── config/                 flavor に対応した設定（AppConfig）
 ├── core/                   AppStateHolder（機器の状態）/ MissedCallManager（不在着信の件数）
-│   └── mvi/                UiState / UiIntent / UiEffect / Reducer / MviViewModel / CollectEffect
+│   └── mvi/                UiState / UiIntent / UiEffect / Reducer
 ├── di/                     Hilt モジュール（AppModule / RepositoryModule / Qualifiers）
 ├── service/                MonitoringService — TCP の常時監視
 ├── domain/
@@ -477,3 +577,62 @@ ViewModel まで含めて検証する場合は `kotlinx-coroutines-test` の `ru
   画面消灯の経路は `ACTION_SCREEN_OFF` で拾うのでこの影響を受けない。
 - プロセスが破棄されてからの再起動は、状態が初期値に戻るためスリープ画面から始まらない。
   それも必ずスリープにしたいなら、`IdleTimer` の `_isSleeping` の初期値を `true` にする。
+
+
+route例
+
+data object Main : Route {
+    // 既存の遷移で使うパス
+    override val path: String = "main"
+
+    // NavHost の登録で使うパターン
+    const val ROUTE =
+        "main?selectTab={selectTab}&contactTab={contactTab}"
+
+    fun createRoute(
+        selectTab: String? = null,
+        contactTab: String? = null,
+    ): String {
+        val query = listOfNotNull(
+            selectTab?.let { "selectTab=${Uri.encode(it)}" },
+            contactTab?.let { "contactTab=${Uri.encode(it)}" },
+        ).joinToString("&")
+
+        return if (query.isEmpty()) path else "$path?$query"
+    }
+}
+
+composable(
+    route = "main?selectTab={selectTab}&contactTab={contactTab}",
+    arguments = listOf(
+        navArgument("selectTab") {
+            type = NavType.StringType
+            nullable = true
+            defaultValue = null
+        },
+        navArgument("contactTab") {
+            type = NavType.StringType
+            nullable = true
+            defaultValue = null
+        },
+    ),
+) { entry ->
+    val selectTab = entry.arguments?.getString("selectTab")
+    val contactTab = entry.arguments?.getString("contactTab")
+
+    // "main" で遷移した場合、どちらも null
+}
+
+// 両方とも null
+nav.navigate(Route.Main.createRoute())
+
+// selectTab だけ指定
+nav.navigate(Route.Main.createRoute(selectTab = "top"))
+
+// 両方指定
+nav.navigate(
+    Route.Main.createRoute(
+        selectTab = "contact",
+        contactTab = "history",
+    )
+)

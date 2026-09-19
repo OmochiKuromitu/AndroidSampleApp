@@ -1,5 +1,6 @@
 package com.example.androidsampleapp.ui.contact
 
+import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
 import com.example.androidsampleapp.ui.common.Route
@@ -16,7 +17,12 @@ class ContactReducerTest {
     private val histories = listOf(CallHistory("1", "玄関", "9月11日 14:32", isMissed = true))
 
     @Test
-    fun `Started で取得中になる`() {
+    fun `初めは電話帳と履歴を受け取るまで読み込み中`() {
+        assertTrue(ContactState().isLoading)
+    }
+
+    @Test
+    fun `Started で前回の失敗が消えて読み込み中に戻る`() {
         val next = reducer.reduce(ContactState(loadFailed = true), ContactIntent.Started)
 
         assertTrue(next.isLoading)
@@ -24,10 +30,21 @@ class ContactReducerTest {
     }
 
     @Test
-    fun `取得できた両方の一覧が入る`() {
+    fun `受け取り済みなら Started でも読み込み中にしない`() {
+        // 開き直したときは前回の一覧を出したまま取り直す。
+        val state = ContactState(contacts = contacts, histories = histories, isAddressBookLoaded = true)
+
+        val next = reducer.reduce(state, ContactIntent.Started)
+
+        assertFalse(next.isLoading)
+        assertEquals(contacts, next.contacts)
+    }
+
+    @Test
+    fun `電話帳と履歴を受け取ったら両方の一覧が入る`() {
         val next = reducer.reduce(
-            ContactState(isLoading = true),
-            ContactIntent.Loaded(contacts = contacts, histories = histories),
+            ContactState(),
+            ContactIntent.AddressBookChanged(AddressBook(contacts = contacts, histories = histories)),
         )
 
         assertEquals(contacts, next.contacts)
@@ -36,10 +53,30 @@ class ContactReducerTest {
     }
 
     @Test
-    fun `取得に失敗したら失敗が立つ`() {
-        val next = reducer.reduce(ContactState(isLoading = true), ContactIntent.LoadFailed)
+    fun `取ったら空だった場合も読み込み中が解ける`() {
+        val next = reducer.reduce(
+            ContactState(),
+            ContactIntent.AddressBookChanged(AddressBook(contacts = emptyList(), histories = emptyList())),
+        )
 
         assertFalse(next.isLoading)
+    }
+
+    @Test
+    fun `取得に失敗したら失敗が立つ`() {
+        val next = reducer.reduce(ContactState(), ContactIntent.LoadFailed)
+
+        assertFalse(next.isLoading)
+        assertTrue(next.loadFailed)
+    }
+
+    @Test
+    fun `取得に失敗しても受け取り済みの一覧は残す`() {
+        val state = ContactState(contacts = contacts, histories = histories, isAddressBookLoaded = true)
+
+        val next = reducer.reduce(state, ContactIntent.LoadFailed)
+
+        assertEquals(contacts, next.contacts)
         assertTrue(next.loadFailed)
     }
 

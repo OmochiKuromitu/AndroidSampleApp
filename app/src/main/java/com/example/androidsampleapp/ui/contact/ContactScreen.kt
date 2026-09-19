@@ -47,7 +47,7 @@ import com.example.androidsampleapp.ui.theme.dimensions
 @Composable
 fun ContactScreen(
     state: ContactState,
-    onIntent: (ContactIntent) -> Unit,
+    onListSelect: (ContactList) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -56,7 +56,7 @@ fun ContactScreen(
                 val badgeCount = if (list == ContactList.HISTORY) state.missedCallCount else 0
                 Tab(
                     selected = list == state.selectedList,
-                    onClick = { onIntent(ContactIntent.ListSelected(list)) },
+                    onClick = { onListSelect(list) },
                     text = {
                         BadgedBox(
                             badge = { if (badgeCount > 0) Badge { Text(badgeCount.toString()) } },
@@ -71,7 +71,8 @@ fun ContactScreen(
         when {
             state.isLoading -> LoadingBox()
 
-            state.loadFailed -> CenteredMessage(
+            // 受け取り済みの一覧があるなら、取り直しに失敗してもそれを出したままにする。
+            state.loadFailed && !state.isAddressBookLoaded -> CenteredMessage(
                 message = stringResource(R.string.contact_load_failed),
                 color = MaterialTheme.colorScheme.error,
             )
@@ -161,9 +162,10 @@ private fun ContactScreenPhonebookPreview() {
                 selectedList = ContactList.PHONEBOOK,
                 contacts = previewContacts,
                 histories = previewHistories,
+                isAddressBookLoaded = true,
                 missedCallCount = 2,
             ),
-            onIntent = {},
+            onListSelect = {},
         )
     }
 }
@@ -177,9 +179,10 @@ private fun ContactScreenHistoryPreview() {
                 selectedList = ContactList.HISTORY,
                 contacts = previewContacts,
                 histories = previewHistories,
+                isAddressBookLoaded = true,
                 missedCallCount = 2,
             ),
-            onIntent = {},
+            onListSelect = {},
         )
     }
 }
@@ -188,6 +191,6 @@ private fun ContactScreenHistoryPreview() {
 @Composable
 private fun ContactScreenLoadFailedPreview() {
     PreviewSurface {
-        ContactScreen(state = ContactState(loadFailed = true), onIntent = {})
+        ContactScreen(state = ContactState(loadFailed = true), onListSelect = {})
     }
 }

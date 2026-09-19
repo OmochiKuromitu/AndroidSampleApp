@@ -14,6 +14,17 @@ sealed interface DeviceMessage {
         val roomTemperature: Double,
     ) : DeviceMessage
 
+    /**
+     * 機器からの通知。`NOTICE|種別|タイトル|詳細|飛び先`。
+     * TODO: 機器側の仕様が決まったら形式を合わせる。今は仮置き。
+     */
+    data class NoticeReceived(
+        val category: String,
+        val title: String?,
+        val message: String,
+        val destination: String,
+    ) : DeviceMessage
+
     data object Pong : DeviceMessage
     data class Unknown(val raw: String) : DeviceMessage
 }

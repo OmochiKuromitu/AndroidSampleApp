@@ -1,5 +1,6 @@
 package com.example.androidsampleapp.data
 
+import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
 import com.example.androidsampleapp.domain.repository.ContactRepository
@@ -8,8 +9,14 @@ import com.example.androidsampleapp.model.ContactResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
+ * 電話帳と履歴は、取った結果を [addressBook] に持つ。@Singleton なので、
+ * 画面を閉じて開き直しても前回の値がすぐ出て、取り直しが終われば差し替わる。
+ *
  * サーバ側が未実装のため、今は仮データを返す。
  * 差し替えるのはこのクラスの中だけで、UseCase から上は変わらない。
  */
@@ -19,13 +26,23 @@ class ContactRepositoryImpl @Inject constructor() : ContactRepository {
     /** TODO: API ができたら削除する。本来はサーバが持つ、未確認の不在着信の件数。 */
     private var fakeServerMissedCallCount: Int = FAKE_HISTORIES.count { it.missed }
 
-    override suspend fun getContacts(): List<Contact> {
+    private val _addressBook = MutableStateFlow<AddressBook?>(null)
+    override val addressBook: StateFlow<AddressBook?> = _addressBook.asStateFlow()
+
+    override suspend fun refreshAddressBook() {
+        // 両方そろってから入れる。片方だけ新しい値が流れて、画面に食い違った組が出るのを防ぐ。
+        val contacts = fetchContacts()
+        val histories = fetchCallHistories()
+        _addressBook.value = AddressBook(contacts = contacts, histories = histories)
+    }
+
+    private suspend fun fetchContacts(): List<Contact> {
         // TODO: GET {AppConfig.apiBaseUrl}/contacts に置き換える。
         delay(API_DELAY_MS)
         return FAKE_CONTACTS.map { it.toDomain() }
     }
 
-    override suspend fun getCallHistories(): List<CallHistory> {
+    private suspend fun fetchCallHistories(): List<CallHistory> {
         // TODO: GET {AppConfig.apiBaseUrl}/call-histories に置き換える。
         delay(API_DELAY_MS)
         return FAKE_HISTORIES.map { it.toDomain() }

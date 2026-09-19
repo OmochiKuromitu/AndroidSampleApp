@@ -9,6 +9,10 @@ package com.example.androidsampleapp.model
 data class NoticeResponse(
     val id: String,
     val category: String,
+    /** 無い通知もある。 */
+    val title: String?,
     val message: String,
+    /** epoch ミリ秒。TODO: API の仕様が決まったら形式を合わせる。 */
+    val occurredAt: Long,
     val destination: String,
 )

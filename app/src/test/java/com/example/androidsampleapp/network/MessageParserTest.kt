@@ -46,6 +46,35 @@ class MessageParserTest {
     }
 
     @Test
+    fun `通知を解釈する`() {
+        val message = parser.parse("NOTICE|ALERT|非常ボタン|集会室の非常ボタンが押されました|TOP")
+
+        assertEquals(
+            DeviceMessage.NoticeReceived(
+                category = "ALERT",
+                title = "非常ボタン",
+                message = "集会室の非常ボタンが押されました",
+                destination = "TOP",
+            ),
+            message,
+        )
+    }
+
+    @Test
+    fun `通知のタイトルが空なら null にする`() {
+        val message = parser.parse("NOTICE|INFO||システムを起動しました|TOP")
+
+        assertEquals(null, (message as DeviceMessage.NoticeReceived).title)
+    }
+
+    @Test
+    fun `詳細の無い通知は Unknown にする`() {
+        val message = parser.parse("NOTICE|ALERT|非常ボタン||TOP")
+
+        assertTrue(message is DeviceMessage.Unknown)
+    }
+
+    @Test
     fun `知らない行は Unknown にする`() {
         val message = parser.parse("HELLO")
 

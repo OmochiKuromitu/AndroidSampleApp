@@ -1,13 +1,14 @@
 package com.example.androidsampleapp.core
 
-import com.example.androidsampleapp.domain.model.CallHistory
-import com.example.androidsampleapp.domain.model.Contact
+import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.repository.ContactRepository
 import com.example.androidsampleapp.domain.usecase.GetMissedCallCountUseCase
 import com.example.androidsampleapp.domain.usecase.MarkMissedCallsAsReadUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -26,9 +27,9 @@ class MissedCallManagerTest {
         var readCount = 0
             private set
 
-        override suspend fun getContacts(): List<Contact> = emptyList()
+        override val addressBook: StateFlow<AddressBook?> = MutableStateFlow(null)
 
-        override suspend fun getCallHistories(): List<CallHistory> = emptyList()
+        override suspend fun refreshAddressBook() = Unit
 
         override suspend fun getMissedCallCount(): Int {
             if (failOnGet()) error("通信失敗")

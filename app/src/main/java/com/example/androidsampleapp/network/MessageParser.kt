@@ -38,6 +38,16 @@ class MessageParser @Inject constructor() {
                 }
             }
 
+            // 詳細が無い通知は出しても意味が無いので Unknown にする。タイトルは空でよい。
+            "NOTICE" -> parts.getOrNull(3)?.takeIf { it.isNotBlank() }?.let { message ->
+                DeviceMessage.NoticeReceived(
+                    category = parts.getOrNull(1).orEmpty(),
+                    title = parts.getOrNull(2)?.takeIf { it.isNotBlank() },
+                    message = message,
+                    destination = parts.getOrNull(4).orEmpty(),
+                )
+            } ?: DeviceMessage.Unknown(raw)
+
             "PONG" -> DeviceMessage.Pong
 
             else -> DeviceMessage.Unknown(raw)

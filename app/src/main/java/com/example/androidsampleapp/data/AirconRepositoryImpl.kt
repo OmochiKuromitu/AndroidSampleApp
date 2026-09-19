@@ -30,7 +30,7 @@ class AirconRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setMode(mode: AirconMode) {
-        send(CommandRequest.SetAirconMode(mode.code)) { it.copy(mode = mode) }
+        send(CommandRequest.SetAirconMode(mode.toCode())) { it.copy(mode = mode) }
     }
 
     override suspend fun setTargetTemperature(value: Double) {

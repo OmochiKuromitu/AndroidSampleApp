@@ -2,21 +2,36 @@ package com.example.androidsampleapp.ui.sleep
 
 import com.example.androidsampleapp.core.mvi.Reducer
 
+/**
+ * スリープ画面の (状態, Intent) -> 次の状態。
+ *
+ * 純粋関数に保つ。時刻の取得、通知の取得、解除の判定に応じた Effect は SleepViewModel が行う。
+ */
 class SleepReducer : Reducer<SleepState, SleepIntent> {
     override fun reduce(state: SleepState, intent: SleepIntent): SleepState = when (intent) {
-        // 消去も取り直しを伴うので、取得と同じく読み込み中にする。
-        SleepIntent.Started,
-        SleepIntent.ClearNoticesClicked,
-        -> state.copy(isLoadingNotices = true, noticeLoadFailed = false)
+        // 取り直しを始めるので、前回の失敗は消す。読み込み中かどうかは受け取れたかで決まる。
+        SleepIntent.Started -> state.copy(noticeLoadFailed = false)
 
-        is SleepIntent.NoticesLoaded -> state.copy(
-            notices = intent.notices,
-            isLoadingNotices = false,
+        // 押しただけでは消さない。確認してから。
+        SleepIntent.ClearNoticesClicked -> state.copy(isClearConfirmVisible = true)
+
+        // 消去も取り直しを伴うので、取得と同じく前回の失敗を消す。
+        SleepIntent.ClearNoticesConfirmed -> state.copy(
+            isClearConfirmVisible = false,
             noticeLoadFailed = false,
         )
 
-        SleepIntent.NoticesLoadFailed ->
-            state.copy(isLoadingNotices = false, noticeLoadFailed = true)
+        SleepIntent.ClearNoticesDismissed -> state.copy(isClearConfirmVisible = false)
+
+        is SleepIntent.ApiNoticesChanged -> state.copy(
+            apiNotices = intent.notices,
+            isApiNoticesLoaded = true,
+            noticeLoadFailed = false,
+        )
+
+        SleepIntent.NoticesLoadFailed -> state.copy(noticeLoadFailed = true)
+
+        is SleepIntent.DeviceNoticesChanged -> state.copy(deviceNotices = intent.notices)
 
         is SleepIntent.Ticked -> state.copy(timeText = intent.timeText, dateText = intent.dateText)
 

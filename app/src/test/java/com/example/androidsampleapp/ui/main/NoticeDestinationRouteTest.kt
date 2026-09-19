@@ -27,17 +27,4 @@ class NoticeDestinationRouteTest {
         assertEquals(Route.TOP, NoticeDestination.Top.toRoute())
         assertEquals(Route.AIRCON, NoticeDestination.Aircon.toRoute())
     }
-
-    @Test
-    fun `API のコードから不在フラグを読み取る`() {
-        assertEquals(
-            NoticeDestination.Contact(hasMissedCall = true),
-            NoticeDestination.fromCode("CONTACT_MISSED"),
-        )
-        assertEquals(
-            NoticeDestination.Contact(hasMissedCall = false),
-            NoticeDestination.fromCode("CONTACT"),
-        )
-        assertEquals(NoticeDestination.Top, NoticeDestination.fromCode("なにか"))
-    }
 }

@@ -13,7 +13,8 @@ description: このリポジトリの Android コード（app/src/main/java/com/
 
 1. **遷移を書くのは `ui/navigation/AppNavigation.kt` だけ。** `NavController` を持つのもここだけ。
    画面や ViewModel から `navigate` を呼ばない。
-2. **`XxxScreen` は表示だけ。** ViewModel も Effect も知らない。配線は `XxxRoute`。
+2. **`XxxScreen` は表示だけ。** ViewModel も Intent も Effect も知らない。配線は `XxxRoute`。
+   Screen は操作ごとのコールバックを受け取り、それを Intent に変えて `onIntent` に渡すのは Route。
 3. **Reducer は純粋関数。** I/O・時刻取得・コルーチン起動を書かない。副作用は ViewModel の `handle()`。
 4. **状態が変わる入口は Reducer だけ。** 通信結果も共有状態の変化も Intent に変換して通す。
 
@@ -27,9 +28,9 @@ description: このリポジトリの Android コード（app/src/main/java/com/
 | `XxxIntent.kt` | `UiIntent` を実装した sealed interface |
 | `XxxEffect.kt` | `UiEffect` を実装した sealed interface |
 | `XxxReducer.kt` | `(State, Intent) -> State` の純粋関数 |
-| `XxxViewModel.kt` | `MviViewModel` を継承。`@HiltViewModel` |
+| `XxxViewModel.kt` | `ViewModel` を継承し、`_uiState` / `_effect` / `reducer` を自分で持つ。`@HiltViewModel` |
 | `XxxRoute.kt` | 配線。ViewModel 取得、State 購読、Effect 受け取り、`LaunchedEffect` |
-| `XxxScreen.kt` | 表示。`state` と `onIntent` だけを受け取る。プレビューもここ |
+| `XxxScreen.kt` | 表示。`state` と操作ごとのコールバックだけを受け取る。プレビューもここ |
 
 ### 骨組み
 
@@ -48,7 +49,7 @@ sealed interface XxxIntent : UiIntent {
     data object LoadFailed : XxxIntent
 }
 
-// XxxEffect.kt — 一回きりの出来事。遷移の「命令」は書かない（理由は後述）
+// XxxEffect.kt — 一回きりの出来事。遷移の「命令」は書かない
 sealed interface XxxEffect : UiEffect {
     data class ShowMessage(@StringRes val messageRes: Int) : XxxEffect
 }
@@ -63,27 +64,46 @@ class XxxReducer : Reducer<XxxState, XxxIntent> {
     }
 }
 
-// XxxViewModel.kt
+// XxxViewModel.kt — 基底クラスは使わない。どの ViewModel もこの形で書く
 @HiltViewModel
 class XxxViewModel @Inject constructor(
     observeItems: ObserveItemsUseCase,
     private val doSomething: DoSomethingUseCase,
-) : MviViewModel<XxxState, XxxIntent, XxxEffect>(
-    initialState = XxxState(),
-    reducer = XxxReducer(),
-) {
+) : ViewModel() {
+
+    // init より上に書く（init の中で onIntent を呼んだときに、まだ初期化されていないと落ちる）
+    private val _uiState = MutableStateFlow(XxxState())
+    val uiState: StateFlow<XxxState> = _uiState.asStateFlow()
+
+    private val _effect = Channel<XxxEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
+
+    private val reducer = XxxReducer()
+
     init {
         // 共有状態の変化も Intent に変換して Reducer に通す
         viewModelScope.launch {
-            observeItems().collect { dispatch(XxxIntent.ItemsChanged(it)) }
+            observeItems().collect { onIntent(XxxIntent.ItemsChanged(it)) }
         }
-        dispatch(XxxIntent.Started)
+        onIntent(XxxIntent.Started)
     }
 
-    override suspend fun handle(intent: XxxIntent, previous: XxxState, current: XxxState) {
+    /** 状態を変えうる入力の入口。操作も、購読した値の変化も、通信の結果も、すべてここを通す。 */
+    fun onIntent(intent: XxxIntent) {
+        var previous: XxxState
+        var current: XxxState
+        // 読んでから書くまでの間に別の更新が入っていたら、読み直してやり直す。
+        do {
+            previous = _uiState.value
+            current = reducer.reduce(previous, intent)
+        } while (!_uiState.compareAndSet(previous, current))
+        viewModelScope.launch { handle(intent, previous, current) }
+    }
+
+    private suspend fun handle(intent: XxxIntent, previous: XxxState, current: XxxState) {
         when (intent) {
             is XxxIntent.ItemClicked -> runCatching { doSomething(intent.id) }
-                .onFailure { sendEffect(XxxEffect.ShowMessage(R.string.command_failed)) }
+                .onFailure { _effect.send(XxxEffect.ShowMessage(R.string.command_failed)) }
 
             XxxIntent.Started,
             is XxxIntent.ItemsChanged,
@@ -93,6 +113,8 @@ class XxxViewModel @Inject constructor(
     }
 }
 ```
+
+副作用が無い画面（`MainViewModel`）は、`onIntent` を `_uiState.update { reducer.reduce(it, intent) }` だけにしてよい。
 
 `handle()` が `previous` と `current` の両方を受け取るのは、「またいだ瞬間の 1 回だけ」を
 表現するため。例: `ui/sleep/SleepViewModel` はスワイプの進み具合が 1.0 に達した瞬間だけ
@@ -106,24 +128,32 @@ fun XxxRoute(
     modifier: Modifier = Modifier,
     viewModel: XxxViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            is XxxEffect.ShowMessage ->
-                snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+    // Effect は LaunchedEffect で受け取る。1 画面で collect するのは 1 か所だけ（Channel なので取り合いになる）
+    LaunchedEffect(viewModel) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is XxxEffect.ShowMessage ->
+                    snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+            }
         }
     }
 
-    XxxScreen(state = state, onIntent = viewModel::dispatch, modifier = modifier)
+    // 操作を Intent に変えるのは Route。Screen に Intent を渡さない
+    XxxScreen(
+        state = state,
+        onItemClick = { viewModel.onIntent(XxxIntent.ItemClicked(it)) },
+        modifier = modifier,
+    )
 }
 
-// XxxScreen.kt — 表示だけ。ViewModel も Effect も知らない
+// XxxScreen.kt — 表示だけ。ViewModel も Intent も Effect も知らない
 @Composable
 fun XxxScreen(
     state: XxxState,
-    onIntent: (XxxIntent) -> Unit,
+    onItemClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) { /* ... */ }
 
@@ -131,7 +161,7 @@ fun XxxScreen(
 @Composable
 private fun XxxScreenPreview() {
     PreviewSurface {
-        XxxScreen(state = XxxState(/* 見たい状態 */), onIntent = {})
+        XxxScreen(state = XxxState(/* 見たい状態 */), onItemClick = {})
     }
 }
 ```
@@ -147,6 +177,31 @@ Route と Screen を分けるのは、Screen を表示だけに保つため。�
 調整してしまう。異常系（未接続、送信中、取得失敗）も 1 つずつ出しておくと、実機で
 再現しづらい状態を目で確認できる。MVI は State が 1 つの data class なので、そこが安い。
 
+## 詳しい話は必要になってから
+
+この下の 2 つは、該当する作業をするときだけ読む。全部読むと文脈を食うし、
+関係のない規約が判断に混じる。
+
+| 読むもの | いつ |
+| --- | --- |
+| `references/navigation.md` | 画面やタブを増やす、遷移を足す、画面に値を渡す、画面内タブを作る |
+| `references/state-and-data.md` | 状態の置き場所に迷う、機器（TCP/UDP）や API（HTTP）の通信を足す、UseCase を足す |
+
+設計の背景と全体像は `README.md`。このスキルは手を動かすときの手順に絞っている。
+
+## テスト
+
+Reducer と `MessageParser` は Android に依存しない純粋な処理なので JVM テストで完結する。
+新しい Reducer を書いたら、最低限「状態が変わる分岐」と「変わらない分岐」を 1 本ずつ。
+
+```
+./gradlew testMockDebugUnitTest
+```
+
+時間に依存するもの（`IdleTimer`）は `runTest` の仮想時間で書く。
+`runCurrent()` と `advanceTimeBy()` を使い分けること。`advanceUntilIdle()` は
+タイマーの完了まで進んでしまうので、「まだ発火していない」を確かめたいときに使えない。
+
 ## 完了の条件
 
 次を満たしたら終わり。満たせないものがあれば、何が残っているかを明示して終える。
@@ -156,24 +211,18 @@ Route と Screen を分けるのは、Screen を表示だけに保つため。�
 3. `./gradlew testMockDebugUnitTest` が通る（実行できる環境なら）。
 4. 構成や規約を変えたら `README.md` とこのスキルの該当箇所も直した。
 
-ビルドと実行の確認はこのリポジトリで作業する環境によって可否が変わる。
-できない環境なら、検証していないことを伝えて終わる。黙って「動きます」と書かない。
-詳細は `AGENTS.md`。
-
-## 詳しい話は必要になってから
-
-この下の 2 つは、該当する作業をするときだけ読む。全部読むと文脈を食うし、
-関係のない規約が判断に混じる。
-
-| 読むもの | いつ |
-| --- | --- |
-| `references/navigation.md` | 画面やタブを増やす、遷移を足す、画面に値を渡す、画面内タブを作る |
-| `references/state-and-data.md` | 状態の置き場所に迷う、機器（TCP/UDP）や API（HTTP）の通信を足す |
-
-設計の背景と全体像は `README.md`。このスキルは手を動かすときの手順に絞っている。
+ビルドと実行の確認は作業する環境によって可否が変わる。できない環境なら、
+検証していないことを伝えて終わる。黙って「動きます」と書かない。詳細は `AGENTS.md`。
 
 ## 踏んだ罠（同じことを繰り返さない）
 
+- **常駐クラスでどのスレッドで動かすかを、クラスの中に書かない。** `scope.launch(Dispatchers.Main)` と書くと、
+  テストで `backgroundScope` を渡しても仮想時間が効かず、JVM テストでは Main が無くて落ちる。
+  スレッドは注入するスコープ（`@ApplicationScope`、メインスレッド）で決める。重い処理は呼ぶ側が `withContext` で切り替える。
+  過去に `@ApplicationScope` を `Dispatchers.Default` にしていて、`IdleTimer` のタイマーが UI スレッドからの呼び出しと状態を取り合っていた。
+- **`LaunchedEffect` の中から親のコールバックを直接呼ばない。** `LaunchedEffect(viewModel)` の中身は
+  最初に起動したときのまま動き続けるので、親が新しいラムダを渡しても古いほうが呼ばれる。
+  `val current by rememberUpdatedState(onXxx)` を挟んで `current()` を呼ぶ（`SleepRoute` が見本）。
 - **KDoc に `path/*.kt` のようなグロブを書かない。** Kotlin のブロックコメントはネストするので、
   `/*` が内側のコメントを開き、`*/` がそれを閉じてファイル末尾まで飲み込む。バッククォートで囲むか書かない。
 - **トレイリングラムダは最後の引数に束縛される。** `viewModel` のような既定値つき引数が
@@ -183,9 +232,6 @@ Route と Screen を分けるのは、Screen を表示だけに保つため。�
   `@Singleton` にしないと届かない。
 - **data class に必須引数を足したら呼び出し側を全部確認する。** `AppConfig` に 1 つ足して
   テストの組み立てを直し忘れ、テストのコンパイルが落ちた。
-- **時間に依存するもののテストで `advanceUntilIdle()` を使わない。** タイマーの完了まで
-  進んでしまうので、「まだ発火していない」を確かめられない。`runCurrent()` と
-  `advanceTimeBy()` を使い分ける（`IdleTimerTest` が見本）。
 - **窓口 ViewModel を「画面が必要とするもの」でまとめない。** それは責務ではないので入れる基準が
   立たず、画面が増えるたびに無関係なものが同居する。責務ごとに分ける。
 

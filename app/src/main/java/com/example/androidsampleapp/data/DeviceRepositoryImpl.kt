@@ -2,15 +2,16 @@ package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.core.AppStateHolder
-import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
+import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.repository.DeviceRepository
 import com.example.androidsampleapp.model.CommandRequest
 import com.example.androidsampleapp.model.DeviceMessage
 import com.example.androidsampleapp.network.MessageParser
 import com.example.androidsampleapp.network.TcpClient
 import com.example.androidsampleapp.network.UdpCommandClient
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -22,7 +23,7 @@ import kotlinx.coroutines.isActive
 
 /**
  * 受信メッセージを [AppStateHolder] に反映する唯一の場所。
- * エアコンの状態も同じ TCP 接続で降ってくるため、ここでまとめて適用する。
+ * エアコンの状態も機器からの通知も同じ TCP 接続で降ってくるため、ここでまとめて適用する。
  */
 @Singleton
 class DeviceRepositoryImpl @Inject constructor(
@@ -35,6 +36,7 @@ class DeviceRepositoryImpl @Inject constructor(
 
     override val connectionState = appStateHolder.connectionState
     override val incomingCall = appStateHolder.incomingCall
+    override val deviceNotices = appStateHolder.deviceNotices
 
     override suspend fun monitor() {
         while (currentCoroutineContext().isActive) {
@@ -59,6 +61,10 @@ class DeviceRepositoryImpl @Inject constructor(
     override suspend fun rejectCall(roomId: String) {
         send(CommandRequest.RejectCall(roomId))
         appStateHolder.updateIncomingCall(null)
+    }
+
+    override fun clearDeviceNotices() {
+        appStateHolder.updateDeviceNotices { emptyList() }
     }
 
     private suspend fun send(command: CommandRequest) {
@@ -89,10 +95,15 @@ class DeviceRepositoryImpl @Inject constructor(
             is DeviceMessage.AirconStatus -> appStateHolder.updateAircon { current ->
                 current.copy(
                     isOn = message.isOn,
-                    mode = AirconMode.fromCode(message.mode),
+                    mode = airconModeOf(message.mode),
                     targetTemperature = message.targetTemperature,
                     roomTemperature = message.roomTemperature,
                 )
+            }
+
+            // 新しいものを先頭に積み、古いものは捨てる。
+            is DeviceMessage.NoticeReceived -> appStateHolder.updateDeviceNotices { current ->
+                (listOf(message.toDomain()) + current).take(MAX_DEVICE_NOTICES)
             }
 
             DeviceMessage.Pong,
@@ -101,20 +112,51 @@ class DeviceRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * 機器は id も時刻も送ってこない前提（仮）。受け取った時点の時刻を入れる。
+     * id は API の通知と一覧の中で重ならないよう、接頭辞を付けて手元で振る。
+     */
+    private fun DeviceMessage.NoticeReceived.toDomain(): Notice = Notice(
+        id = DEVICE_NOTICE_ID_PREFIX + UUID.randomUUID(),
+        category = noticeCategoryOf(category),
+        title = title,
+        message = message,
+        occurredAt = System.currentTimeMillis(),
+        destination = noticeDestinationOf(destination),
+    )
+
     /** mock flavor 用。実機が無くても画面の確認ができるようにする。 */
     private fun fakeEvents(): Flow<TcpClient.Event> = flow {
         emit(TcpClient.Event.Connected)
         emit(TcpClient.Event.Line("AIRCON|ON|COOL|26.0|28.4"))
+        emit(TcpClient.Event.Line("NOTICE|ALERT|非常ボタン|集会室の非常ボタンが押されました|TOP"))
         delay(FAKE_CALL_DELAY_MS)
         emit(TcpClient.Event.Line("CALL|101|玄関"))
+        var pings = 0
+        var sentNotices = 0
         while (currentCoroutineContext().isActive) {
             delay(FAKE_PING_INTERVAL_MS)
             emit(TcpClient.Event.Line("PONG"))
+            // 画面を開いたまま一覧が増えるのを確認できるよう、ときどき通知を流す。
+            // 上限に届いたら通知だけ止める。流れ自体を終わらせると切断とみなされ、
+            // monitor() が繋ぎ直して最初から流し直してしまうので、PONG は送り続ける。
+            if (++pings % FAKE_NOTICE_EVERY_PINGS == 0 && sentNotices < FAKE_NOTICE_LIMIT) {
+                sentNotices++
+                emit(TcpClient.Event.Line("NOTICE|INFO||機器からのテスト通知です（$sentNotices）|TOP"))
+            }
         }
     }
 
     private companion object {
         const val FAKE_CALL_DELAY_MS = 8_000L
         const val FAKE_PING_INTERVAL_MS = 5_000L
+        const val FAKE_NOTICE_EVERY_PINGS = 4
+
+        /** テスト通知を流す回数。これを超えたら流さない（アプリを起動し直すと数え直す）。 */
+        const val FAKE_NOTICE_LIMIT = 20
+
+        /** 手元に持つ機器からの通知の上限。超えたら古いものから捨てる。 */
+        const val MAX_DEVICE_NOTICES = 20
+        const val DEVICE_NOTICE_ID_PREFIX = "device-"
     }
 }

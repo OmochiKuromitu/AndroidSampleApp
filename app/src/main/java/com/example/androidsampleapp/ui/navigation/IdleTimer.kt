@@ -31,6 +31,8 @@ import kotlinx.coroutines.launch
  * 画面遷移そのものは行わない。[isSleeping] を見た [AppNavigation] が遷移する。
  *
  * 呼び出しはすべてメインスレッドから来る前提（UI のイベントと Application の受信）。
+ * タイマーも同じくメインスレッドで動く（[ApplicationScope]）。別スレッドで動かすと、
+ * タイマーの完了と [resetTimer] などの呼び出しが食い違い、状態が壊れることがある。
  */
 @Singleton
 class IdleTimer @Inject constructor(

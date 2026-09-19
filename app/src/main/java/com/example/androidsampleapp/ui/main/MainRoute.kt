@@ -22,7 +22,7 @@ fun MainRoute(
     viewModel: MainViewModel = hiltViewModel(),
     content: @Composable () -> Unit,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     MainScreen(
         state = state,

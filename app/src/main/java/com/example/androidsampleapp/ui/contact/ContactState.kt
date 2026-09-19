@@ -26,12 +26,34 @@ enum class ContactList(@StringRes val labelRes: Int) {
     }
 }
 
+/**
+ * 連絡先画面の状態。
+ *
+ * 電話帳と履歴の持ち主は ContactRepository で、ここにはその写しが入る。
+ * 取り直すのは画面を開いたときだけで、タブの切り替えでは取り直さない。
+ * 不在着信の件数だけは複数の画面が見るので、持ち主は MissedCallManager で、ここにはその写しが入る。
+ */
 data class ContactState(
+    /** 画面の中で今出しているリスト。 */
     val selectedList: ContactList = ContactList.PHONEBOOK,
     val contacts: List<Contact> = emptyList(),
     val histories: List<CallHistory> = emptyList(),
-    val isLoading: Boolean = false,
+    /**
+     * 電話帳と履歴を一度でも受け取れたか。
+     * 「まだ取っていない空」と「取ったら空だった」を分けるために持つ。
+     */
+    val isAddressBookLoaded: Boolean = false,
+    /** 直近の取得に失敗した。受け取り済みの一覧があればそれを出したままにする。 */
     val loadFailed: Boolean = false,
     /** 履歴タブに出すバッジの件数。0 なら出さない。 */
     val missedCallCount: Int = 0,
-) : UiState
+) : UiState {
+    /**
+     * まだ一度も受け取れておらず、失敗もしていない間。
+     *
+     * 取得の完了を Intent で待たずに、受け取れたかどうかから決める。StateFlow は同じ値を
+     * 入れ直しても流れないので、「流れてきたら読み込み終わり」にすると取り直しで止まるため。
+     */
+    val isLoading: Boolean
+        get() = !isAddressBookLoaded && !loadFailed
+}
