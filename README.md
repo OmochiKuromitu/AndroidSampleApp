@@ -430,8 +430,16 @@ app/src/main/java/com/example/androidsampleapp/
 ### 足すとき
 
 手順と雛形は `.claude/skills/android-screen/SKILL.md` にまとめてある。
-Claude Code はこのリポジトリで作業するとき自動で参照する。
-このドキュメントが「なぜそうなっているか」、スキルが「何をどこへ書くか」を持つ。
+エージェントはこのリポジトリで作業するとき自動で参照する。
+細かい話は同ディレクトリの `references/` に分けてあり、該当する作業のときだけ読む形。
+
+役割分担はこう。
+
+| ファイル | 持つもの |
+| --- | --- |
+| `README.md`（これ） | なぜそうなっているか。設計の理由 |
+| `AGENTS.md` | ビルドとテストの動かし方、完了の条件、進め方 |
+| `SKILL.md` + `references/` | 何をどこへ書くか。手順と雛形 |
 
 - **画面を 1 つ足す** — `ui/<name>/` に 7 ファイル。ViewModel は `@HiltViewModel`。
   遷移が要るなら Effect で「何が起きたか」を返し、行き先は `AppNavigation` に書く。

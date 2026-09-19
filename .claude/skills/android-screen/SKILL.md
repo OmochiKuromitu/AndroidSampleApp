@@ -1,6 +1,6 @@
 ---
 name: android-screen
-description: このリポジトリ（Jetpack Compose + MVI + Hilt の壁付けパネルアプリ）で画面・タブ・機能を追加、変更、レビューするときの作り方。新しい画面を作る、タブを増やす、ViewModel や Reducer を書く、遷移を足す、API やデバイス通信を足す、状態の置き場所に迷う、といった場面では必ず最初にこれを読むこと。「画面を追加して」「エアコン画面に〜を足して」「通知の一覧を〜」のように機能名だけで依頼された場合も、このリポジトリのコードに触るなら該当する。ファイル構成と命名の規約、遷移の書き方、状態の置き場所の判断基準、過去に踏んだコンパイルエラーの罠が入っている。
+description: このリポジトリの Android コード（app/src/main/java/com/example/androidsampleapp 配下）に画面・タブ・ViewModel・Reducer・遷移・通信を追加または変更するときのファイル構成と規約。Compose + MVI + Hilt の壁付けパネルアプリで、7 ファイル構成と Route/Screen の分離に沿わせる必要がある。そのコードを編集する前に読む。読み方の説明や設計の背景だけを聞かれている場合は README.md を見ればよい。
 ---
 
 # このリポジトリで画面を作る
@@ -147,122 +147,30 @@ Route と Screen を分けるのは、Screen を表示だけに保つため。�
 調整してしまう。異常系（未接続、送信中、取得失敗）も 1 つずつ出しておくと、実機で
 再現しづらい状態を目で確認できる。MVI は State が 1 つの data class なので、そこが安い。
 
-## 遷移を足す
+## 完了の条件
 
-1. `ui/common/Route.kt` にルート文字列を 1 行。
-2. タブなら `ui/main/MainState.kt` の `MainTab` に 1 行（ルートは `Route.XXX` を渡す）。
-3. `AppNavigation` の `NavHost` に `composable(Route.XXX) { ... }` を 1 つ。
+次を満たしたら終わり。満たせないものがあれば、何が残っているかを明示して終える。
 
-下部バーを出す画面は `MainRoute` で包む。選択状態にするタブは `MainTab.fromRoute(Route.XXX)`
-で引くこと。`MainTab.XXX` と直接書かないのは、遷移に使う値の出どころを `Route` に
-揃えておくため。
+1. 追加・変更したコードが上の「まず守ること」と 7 ファイル構成に沿っている。
+2. Reducer を追加または変更したら、対応するテストがある。
+3. `./gradlew testMockDebugUnitTest` が通る（実行できる環境なら）。
+4. 構成や規約を変えたら `README.md` とこのスキルの該当箇所も直した。
 
-### 画面に値を渡す
+ビルドと実行の確認はこのリポジトリで作業する環境によって可否が変わる。
+できない環境なら、検証していないことを伝えて終わる。黙って「動きます」と書かない。
+詳細は `AGENTS.md`。
 
-ルートに引数を付ける。受け取るのは ViewModel の `SavedStateHandle`。
-見本は `ui/contact`（通知から不在着信で飛ぶと履歴タブで開く）。
+## 詳しい話は必要になってから
 
-1. `Route` に引数名と、引数を含むパターン（`"contact?list={list}"`）、ルートを組み立てる関数。
-2. `AppNavigation` の `composable` に `arguments = listOf(navArgument(...) { ... })`。
-   省略可能にするなら `nullable = true` と `defaultValue = null`。
-3. ViewModel のコンストラクタで `savedStateHandle` から読み、**`initialState` で解決する**。
-   Intent にすると、取得が終わる前に既定の表示が一瞬見えてから切り替わる。
-4. 引数つきのルートへ飛ぶときは `restoreState` を使わない。復元すると保存済みの
-   エントリがそのまま戻り、新しく渡した引数が無視される。
+この下の 2 つは、該当する作業をするときだけ読む。全部読むと文脈を食うし、
+関係のない規約が判断に混じる。
 
-飛び先によって伴う情報が違うなら、飛び先の型を `enum` ではなく `sealed interface` にする。
-ドメインは事実（不在着信があった）だけを持ち、「だからどのタブを開くか」は ui 層が決める。
+| 読むもの | いつ |
+| --- | --- |
+| `references/navigation.md` | 画面やタブを増やす、遷移を足す、画面に値を渡す、画面内タブを作る |
+| `references/state-and-data.md` | 状態の置き場所に迷う、機器（TCP/UDP）や API（HTTP）の通信を足す |
 
-### 画面の中のタブ
-
-遷移を伴わないタブ（連絡先の電話帳 / 履歴）はルートを増やさない。どれを出しているかは
-画面の状態なので `XxxState` に持たせ、`TabRow` で出し分ける。データは開いたときに
-まとめて取り、タブを触るたびに通信しない。
-
-画面から遷移したいときは、ViewModel が **「何が起きたか」** を Effect で返し、
-`AppNavigation` が行き先を決める。
-
-```kotlin
-// よい: 出来事の報告
-sealed interface SleepEffect : UiEffect {
-    data object Unlocked : SleepEffect
-    data class NoticeSelected(val destination: NoticeDestination) : SleepEffect
-}
-
-// 避ける: 遷移の命令
-data class NavigateToAircon(...) : SleepEffect
-```
-
-命令にすると、行き先の判断が画面ごとに散る。報告にしておけば「この出来事が起きたら
-どこへ行くか」が `AppNavigation` だけを読めば分かる。
-
-## 状態をどこに置くか
-
-判断の目安は「全画面が見るか」ではなく **書き手と読み手の数**。
-
-| 置き場所 | 何を置くか | 書き手 |
-| --- | --- | --- |
-| `XxxState` | 画面固有（送信中フラグ、入力中の値、表示の進み具合） | その画面の Reducer |
-| `core/AppStateHolder` | 機器から TCP で降ってくる状態（接続、着信、エアコン） | `data/DeviceRepositoryImpl` だけ |
-| 専用の `@Singleton` | 画面をまたいで共有するもの（`IdleTimer` のスリープ状態、`MissedCallManager` の不在着信件数） | そのクラス自身 |
-
-**読み手が 1 画面なら共有の器を作らない。** その画面の `XxxState` に持たせる。
-読み手が 2 か所以上になった時点で `@Singleton` に引き上げる。
-`@Singleton` の保持先は Hilt の `SingletonComponent`（Application と同じ寿命）なので、
-`App` に手で持たせる必要はない。
-
-HTTP のように能動的に取りに行くものは、取得のきっかけを `AppNavigation` が決め、
-マネージャーは呼ばれたら取るだけにする。各画面がそれぞれ叩くと、画面が増えるたびに
-取得のタイミングが散る。実行中の要求が重ならないよう `refresh()` 側で間引くこと。
-見本は `core/MissedCallManager`。
-
-共有の器は書き手が複数いて初めて元が取れる。書き手が 1 つなら、そのクラスに持たせる。
-過去に「全画面が見るから」で `AppStateHolder` にスリープ状態を入れて、状態を持つ場所と
-更新を決める場所が分かれてしまい、`IdleTimer` を読むだけでは挙動が追えなくなった。
-
-## データを足す
-
-機器（TCP/UDP）と API（HTTP）で経路が違う。混ぜない。
-
-- **機器から来る** — `network/MessageParser` に解釈を足し、`model/DeviceMessage` に型を足し、
-  `data/DeviceRepositoryImpl` が `AppStateHolder` に反映する。
-- **API から来る** — `model/` にレスポンス型、`data/` のリポジトリが自分で保持して
-  `toDomain()` で変換。`AppStateHolder` は通さない。`data/NoticeRepositoryImpl` が見本。
-- 機器へ送るコマンドは `model/CommandRequest` に 1 件足す。文字列化はその型が持つ。
-
-どちらの場合も `domain/repository/` に interface、`domain/usecase/` に UseCase、
-`di/RepositoryModule` に `@Binds` を 1 行。ui 層は実装クラスを知らないままにする。
-
-### UseCase の粒度
-
-**呼び出し側から見た 1 つの操作に対して 1 つ。** リポジトリのメソッドを 1 対 1 で
-包み直すために作らない。
-
-- よい: `ClearNoticesUseCase` は消去 API を呼んでから取得 API を呼び、新しい一覧を返す。
-  呼び出し側は「消した結果の一覧が返る」とだけ知っていればよく、API が 2 本であることを知らない。
-- 避ける: `RefreshNoticesUseCase`（取りに行く）と `ObserveNoticesUseCase`（結果を見る）に
-  分ける。同じ 1 つの関心事が 2 つに割れて、ViewModel が両方を注入する羽目になる。
-
-ViewModel が 3 つ以上 UseCase を注いでいたら、割りすぎを疑う。
-なお `ObserveXxxUseCase` のように `StateFlow` を素通しするだけのものは、
-機器の共有状態（接続、着信、エアコン）のように複数画面が同じものを見る場合に限る。
-
-flavor で変わる値（接続先、タイムアウト、API のベース URL）は
-`app/build.gradle.kts` の `buildConfigField` と `config/AppConfig` に置く。
-アプリ側は `BuildConfig` を直接触らない。
-
-## テスト
-
-Reducer と `MessageParser` は Android に依存しない純粋な処理なので JVM テストで完結する。
-新しい Reducer を書いたら、最低限「状態が変わる分岐」と「変わらない分岐」を 1 本ずつ。
-
-```
-./gradlew testMockDebugUnitTest
-```
-
-時間に依存するもの（`IdleTimer`）は `runTest` の仮想時間で書く。
-`runCurrent()` と `advanceTimeBy()` を使い分けること。`advanceUntilIdle()` は
-タイマーの完了まで進んでしまうので、「まだ発火していない」を確かめたいときに使えない。
+設計の背景と全体像は `README.md`。このスキルは手を動かすときの手順に絞っている。
 
 ## 踏んだ罠（同じことを繰り返さない）
 
@@ -275,6 +183,9 @@ Reducer と `MessageParser` は Android に依存しない純粋な処理なの�
   `@Singleton` にしないと届かない。
 - **data class に必須引数を足したら呼び出し側を全部確認する。** `AppConfig` に 1 つ足して
   テストの組み立てを直し忘れ、テストのコンパイルが落ちた。
+- **時間に依存するもののテストで `advanceUntilIdle()` を使わない。** タイマーの完了まで
+  進んでしまうので、「まだ発火していない」を確かめられない。`runCurrent()` と
+  `advanceTimeBy()` を使い分ける（`IdleTimerTest` が見本）。
 - **窓口 ViewModel を「画面が必要とするもの」でまとめない。** それは責務ではないので入れる基準が
   立たず、画面が増えるたびに無関係なものが同居する。責務ごとに分ける。
 
