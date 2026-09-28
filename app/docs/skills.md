@@ -60,7 +60,7 @@ composable(
         snackbarHostState = snackbarHostState,
     )
 }
-```
+
 // スリープ画面
 SleepRoute(
     onNoticeSelected = { destination ->
@@ -73,3 +73,4 @@ SleepRoute(
     },
 )
 
+```
