@@ -47,8 +47,8 @@ import java.util.Locale
 /**
  * 受け取った通知の一覧。消去ボタンは一覧の右上に小さく置く。
  *
- * 1 件ずつ白いカードで出す。警報は他より先に見せたいので上にまとめ、
- * それ以外との間に線を引く。グループの中の順番は受け取った順のまま。
+ * 1 件ずつ白いカードで出す。優先表示のフラグ（[Notice.isPinned]）が立っているものは上にまとめ、
+ * それ以外との間に線を引く。フラグ付きの中は受け取った順のまま、それ以外は起きた日時の新しい順。
  *
  * 行をタップすると、その通知が持つ飛び先を [onNoticeClick] に返す。
  * どこへ飛ぶかは通知自身が知っているので、この一覧は分類と遷移先の対応を持たない。
@@ -116,18 +116,19 @@ fun NoticeList(
             return@Column
         }
 
-        val (alerts, others) = notices.partition { it.category == NoticeCategory.ALERT }
+        // 一覧が変わったときだけ分け直す。再描画のたびに並べ替えない。
+        val (pinned, others) = remember(notices) { splitPinned(notices) }
 
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.dimensions.spaceSmall),
         ) {
-            items(alerts, key = { it.id }) { notice ->
+            items(pinned, key = { it.id }) { notice ->
                 NoticeCard(notice = notice, onClick = { onNoticeClick(notice) })
             }
             // 片方しか無いときに線だけ浮かないよう、両方あるときだけ引く。
-            if (alerts.isNotEmpty() && others.isNotEmpty()) {
-                item(key = ALERT_DIVIDER_KEY) {
+            if (pinned.isNotEmpty() && others.isNotEmpty()) {
+                item(key = PINNED_DIVIDER_KEY) {
                     HorizontalDivider(
                         color = contentColor.copy(alpha = 0.4f),
                         modifier = Modifier.padding(
@@ -261,4 +262,13 @@ private val TAG_WIDTH = 80.dp
 private const val OCCURRED_AT_PATTERN = "M月d日 HH:mm"
 
 /** 通知の id と重ならない、区切り線用の key。 */
-private const val ALERT_DIVIDER_KEY = "alert-divider"
+private const val PINNED_DIVIDER_KEY = "pinned-divider"
+
+/**
+ * 一覧を、優先表示のフラグが立っているものと、それ以外に分ける。
+ * フラグ付きは受け取った順のまま、それ以外は起きた日時の新しい順に並べる。
+ */
+internal fun splitPinned(notices: List<Notice>): Pair<List<Notice>, List<Notice>> {
+    val (pinned, unpinned) = notices.partition { it.isPinned }
+    return pinned to unpinned.sortedByDescending { it.occurredAt }
+}

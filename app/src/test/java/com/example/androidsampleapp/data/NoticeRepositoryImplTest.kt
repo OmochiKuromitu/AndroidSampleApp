@@ -10,6 +10,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -62,7 +63,7 @@ class NoticeRepositoryImplTest {
                 """
                 [
                   {"id":"1","category":"ALERT","title":"フィルター","message":"清掃時期です",
-                   "occurredAt":1000,"destination":"AIRCON","unknownField":"無視される"},
+                   "occurredAt":1000,"destination":"AIRCON","pinned":true,"unknownField":"無視される"},
                   {"id":"2","category":"INFO","message":"起動しました","occurredAt":500,"destination":"TOP"}
                 ]
                 """.trimIndent(),
@@ -81,8 +82,10 @@ class NoticeRepositoryImplTest {
         assertEquals(NoticeCategory.ALERT, notices[0].category)
         assertEquals(NoticeDestination.Aircon, notices[0].destination)
         assertEquals(1000L, notices[0].occurredAt)
-        // title は項目ごと無くても読める。
+        assertTrue(notices[0].isPinned)
+        // title と pinned は項目ごと無くても読める。pinned が無ければ優先しない通知。
         assertNull(notices[1].title)
+        assertFalse(notices[1].isPinned)
     }
 
     @Test

@@ -151,6 +151,8 @@ class FakeApiInterceptorTest {
         assertEquals(NOW - HOUR_MS, notices[0].occurredAt)
         assertEquals("室外機の通信が途絶えています\n点検を依頼してください", notices[3].message)
         assertNull(notices[4].title)
+        // mock で優先表示を確かめられるよう、4 件目だけにフラグを立てている。
+        assertEquals(listOf("4"), notices.filter { it.pinned }.map { it.id })
     }
 
     @Test

@@ -16,6 +16,8 @@ data class Notice(
     /** 起きた日時（epoch ミリ秒）。表示用の文字列ではなく比べられる値で持ち、整形は ui 層で行う。 */
     val occurredAt: Long,
     val destination: NoticeDestination,
+    /** 優先して見せる通知か。立っていれば一覧の上にまとめて出す。 */
+    val isPinned: Boolean = false,
 )
 
 /**

@@ -52,5 +52,6 @@ class NoticeRepositoryImpl @Inject constructor(
         message = message,
         occurredAt = occurredAt,
         destination = noticeDestinationOf(destination),
+        isPinned = pinned,
     )
 }

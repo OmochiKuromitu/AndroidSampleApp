@@ -16,6 +16,8 @@ data class SleepState(
     val dateText: String = "",
     /** 一覧に出す通知。持ち主は MissedCallManager で、ここにはその写しが入る。 */
     val notices: List<Notice> = emptyList(),
+    /** appstateholderからはいる通知 */
+    val emergencyNotice: List<Notice> = emptyList(),
     /** API の通知をまだ一度も受け取れておらず、失敗もしていない間。決めるのは MissedCallManager。 */
     val isLoadingNotices: Boolean = false,
     /** MissedCallManager の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
@@ -31,4 +33,5 @@ data class SleepState(
     /** 解除に必要な距離に届いたか。届いた瞬間に ViewModel が解除の Effect を出す。 */
     val isUnlockReached: Boolean
         get() = unlockProgress >= 1f
+    val allNotices: List<Notice> = notices + emergencyNotice
 }

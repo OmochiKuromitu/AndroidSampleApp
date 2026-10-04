@@ -192,6 +192,7 @@ private val previewNotices = listOf(
         "室外機の通信が途絶えています\n点検を依頼してください",
         PREVIEW_NOW - 20 * PREVIEW_HOUR,
         NoticeDestination.Aircon,
+        isPinned = true,
     ),
     Notice("5", NoticeCategory.INFO, null, "システムを起動しました", PREVIEW_NOW - 30 * PREVIEW_HOUR, NoticeDestination.Top),
 )

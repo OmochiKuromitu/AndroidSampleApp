@@ -231,7 +231,8 @@ class FakeApiInterceptor(
             "title": "故障情報：0402",
             "message": "室外機の通信が途絶えています\n点検を依頼してください",
             "occurredAt": ${now - 20 * HOUR_MS},
-            "destination": "AIRCON"
+            "destination": "AIRCON",
+            "pinned": true
           },
           {
             "id": "5",

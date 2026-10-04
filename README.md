@@ -492,8 +492,9 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 （`SleepState.isClearConfirmVisible` / `ContactState.isClearConfirmVisible`）が持つ。
 
 1 件ずつ白いカードで出し、1 行目に「種別・タイトル・時刻」、2 行目に詳細を置く。
-**警報（`ALERT`）は上にまとめ、それ以外との間に線を引く。** 並べ替えは表示の都合なので
-`ui/common/NoticeList` で行い、グループの中はサーバから来た順（新しいものが先頭）のまま。
+**優先表示のフラグ（API の `pinned`、ドメインの `Notice.isPinned`）が立っているものは上にまとめ、
+それ以外との間に線を引く。** フラグ付きの中はサーバから来た順のまま、それ以外は `occurredAt` の新しい順に並べる。
+分けて並べるのは表示の都合なので `ui/common/NoticeList` で行う。`pinned` が省かれた通知はフラグ無しとして読む。
 
 読み手が 2 画面あるので、一覧は `core/MissedCallManager`（`@Singleton`）が不在着信の件数と一緒に持つ。
 取得のきっかけは `AppNavigation` が決め、マネージャーは呼ばれたら取るだけ。

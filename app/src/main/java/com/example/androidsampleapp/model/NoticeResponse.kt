@@ -20,4 +20,6 @@ data class NoticeResponse(
     /** epoch ミリ秒。 */
     val occurredAt: Long,
     val destination: String,
+    /** 優先表示のフラグ。項目ごと省かれたら優先しない通知として読む。 */
+    val pinned: Boolean = false,
 )
