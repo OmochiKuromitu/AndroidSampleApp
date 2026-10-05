@@ -3,12 +3,16 @@ package com.example.androidsampleapp.ui.contact
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.androidsampleapp.core.MissedCallManager
+import com.example.androidsampleapp.domain.usecase.ClearNoticesUseCase
+import com.example.androidsampleapp.domain.usecase.MarkMissedCallsAsReadUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveAddressBookUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveMissedCallCountUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveNoticesUseCase
 import com.example.androidsampleapp.domain.usecase.RefreshAddressBookUseCase
 import com.example.androidsampleapp.ui.common.Route
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,17 +27,19 @@ import kotlinx.coroutines.launch
  * - 最初に開くリストは遷移の引数（SavedStateHandle）から、初期状態の時点で決める。
  * - 電話帳と履歴は ContactRepository を購読し、値が変わるたびに Intent にする。
  *   画面を開いたら取り直しを頼み、失敗したときだけ Intent で戻す（成功した結果は購読側に流れる）。
- * - 不在着信の件数は MissedCallManager を購読するだけで、履歴を見せたら既読を頼む。
- * - お知らせの一覧は MissedCallManager を購読するだけで、自分では取りに行かない（きっかけは AppNavigation）。
- *   確認ダイアログで消去を選ばれたら MissedCallManager に頼む。
+ * - 不在着信の件数と通知一覧も UseCase を通して購読する。共通の取得のきっかけは AppNavigation。
+ * - 履歴を見せたら既読の UseCase、確認ダイアログで消去を選ばれたら消去の UseCase を呼ぶ。
  *   お知らせがタップされたら Effect を出し、どこへ行くかは AppNavigation が決める。
  */
 @HiltViewModel
 class ContactViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val missedCallManager: MissedCallManager,
     observeAddressBook: ObserveAddressBookUseCase,
+    observeMissedCallCount: ObserveMissedCallCountUseCase,
+    observeNotices: ObserveNoticesUseCase,
     private val refreshAddressBook: RefreshAddressBookUseCase,
+    private val markMissedCallsAsRead: MarkMissedCallsAsReadUseCase,
+    private val clearNotices: ClearNoticesUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -58,15 +64,15 @@ class ContactViewModel @Inject constructor(
                 onIntent(ContactIntent.AddressBookChanged(it))
             }
         }
-        // 取得は MissedCallManager が行う。ここは件数を見るだけ。
+        // 前回の共有値も購読を始めた時点で届く。
         viewModelScope.launch {
-            missedCallManager.missedCallCount.collect {
+            observeMissedCallCount().collect {
                 onIntent(ContactIntent.MissedCallCountChanged(it))
             }
         }
-        // 取得は MissedCallManager が行い、きっかけは AppNavigation が決める。ここは一覧を見るだけ。
+        // 取得・消去の結果と失敗状況は Repository の共有状態として届く。
         viewModelScope.launch {
-            missedCallManager.noticeSnapshot.collect { onIntent(ContactIntent.NoticesChanged(it)) }
+            observeNotices().collect { onIntent(ContactIntent.NoticesChanged(it)) }
         }
         onIntent(ContactIntent.Started)
     }
@@ -95,17 +101,21 @@ class ContactViewModel @Inject constructor(
             ContactIntent.Started -> {
                 refresh()
                 // 履歴から開いたなら、その時点で見せたことになる。
-                if (current.selectedList == ContactList.HISTORY) missedCallManager.markAsRead()
+                if (current.selectedList == ContactList.HISTORY) {
+                    requestSharedState { markMissedCallsAsRead() }
+                }
             }
 
             // 履歴を見せたので既読にする。件数で間引かないのは、件数がまだ届いていない
             // タイミングで開かれると取りこぼすため。既読 API は何度呼んでも同じ結果になる前提。
             is ContactIntent.ListSelected ->
-                if (intent.list == ContactList.HISTORY) missedCallManager.markAsRead()
+                if (intent.list == ContactList.HISTORY) {
+                    requestSharedState { markMissedCallsAsRead() }
+                }
 
-            // 結果は MissedCallManager の一覧の変化として NoticesChanged で戻る。
+            // 結果は購読側から NoticesChanged で戻る。
             // 押しただけの ClearNoticesClicked では消さない（確認ダイアログを出すだけ）。
-            ContactIntent.ClearNoticesConfirmed -> missedCallManager.clearNotices()
+            ContactIntent.ClearNoticesConfirmed -> requestSharedState { clearNotices() }
 
             is ContactIntent.NoticeClicked ->
                 _effect.send(ContactEffect.NoticeSelected(intent.notice.destination))
@@ -122,7 +132,22 @@ class ContactViewModel @Inject constructor(
 
     /** 成功した結果は ContactRepository の値の変化として購読側に届くので、ここは失敗だけを戻す。 */
     private suspend fun refresh() {
-        runCatching { refreshAddressBook() }
-            .onFailure { onIntent(ContactIntent.LoadFailed) }
+        try {
+            refreshAddressBook()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onIntent(ContactIntent.LoadFailed)
+        }
+    }
+
+    private suspend fun requestSharedState(request: suspend () -> Unit) {
+        try {
+            request()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 件数は前回値を残し、通知の失敗は NoticesChanged で受け取る。
+        }
     }
 }

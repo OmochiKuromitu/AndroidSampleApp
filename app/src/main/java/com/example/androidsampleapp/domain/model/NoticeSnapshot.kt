@@ -1,8 +1,6 @@
-package com.example.androidsampleapp.core
+package com.example.androidsampleapp.domain.model
 
-import com.example.androidsampleapp.domain.model.Notice
-
-/** 通知一覧の今の姿。画面はこれをそのまま描く。持ち主は [MissedCallManager]。 */
+/** 通知一覧と直近の取得状況。Repository が公開し、各画面が同じ結果を購読する。 */
 data class NoticeSnapshot(
     /** 新しい順に並べた一覧。 */
     val notices: List<Notice> = emptyList(),

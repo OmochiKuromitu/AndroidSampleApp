@@ -1,6 +1,6 @@
 package com.example.androidsampleapp.ui.contact
 
-import com.example.androidsampleapp.core.NoticeSnapshot
+import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.Notice
@@ -8,7 +8,7 @@ import com.example.androidsampleapp.domain.model.Notice
 /**
  * 連絡先画面の状態を変えうる入力の一覧。
  *
- * 利用者の操作、ContactRepository の電話帳と履歴の変化、取得の失敗、MissedCallManager の件数と一覧の変化を、
+ * 利用者の操作、ContactRepository の電話帳と履歴の変化、取得の失敗、Repository の件数と一覧の変化を、
  * すべてここから Reducer に通す。
  */
 sealed interface ContactIntent : UiIntent {
@@ -27,10 +27,10 @@ sealed interface ContactIntent : UiIntent {
     /** 電話帳か履歴のどちらかの取得に失敗した。片方だけ出すことはしない。 */
     data object LoadFailed : ContactIntent
 
-    /** 不在着信の件数の変化。取得は MissedCallManager が行う。 */
+    /** 不在着信の件数の変化。Repository が取得し、UseCase 経由で購読する。 */
     data class MissedCallCountChanged(val count: Int) : ContactIntent
 
-    /** お知らせの一覧の変化。取得・消去の結果も、その失敗もここに戻る。取得は MissedCallManager が行う。 */
+    /** お知らせの一覧の変化。取得・消去の結果も、その失敗もここに戻る。Repository が取得し、UseCase 経由で購読する。 */
     data class NoticesChanged(val snapshot: NoticeSnapshot) : ContactIntent
 
     /** お知らせタブの消去ボタンを押した。まだ消さず、確認ダイアログを出す。 */

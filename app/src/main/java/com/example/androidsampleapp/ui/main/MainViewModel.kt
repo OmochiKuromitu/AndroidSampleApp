@@ -2,8 +2,8 @@ package com.example.androidsampleapp.ui.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.androidsampleapp.core.MissedCallManager
 import com.example.androidsampleapp.domain.usecase.ObserveConnectionStateUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveMissedCallCountUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class MainViewModel @Inject constructor(
     observeConnectionState: ObserveConnectionStateUseCase,
-    missedCallManager: MissedCallManager,
+    observeMissedCallCount: ObserveMissedCallCountUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainState())
@@ -36,9 +36,9 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             observeConnectionState().collect { onIntent(MainIntent.ConnectionStateChanged(it)) }
         }
-        // 取得は MissedCallManager が行う。ここは件数を見るだけ。
+        // Repository が公開する共有件数を UseCase 経由で購読する。
         viewModelScope.launch {
-            missedCallManager.missedCallCount.collect {
+            observeMissedCallCount().collect {
                 onIntent(MainIntent.MissedCallCountChanged(it))
             }
         }

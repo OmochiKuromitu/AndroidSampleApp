@@ -1,6 +1,6 @@
 package com.example.androidsampleapp.ui.contact
 
-import com.example.androidsampleapp.core.NoticeSnapshot
+import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact

@@ -13,6 +13,6 @@ sealed interface MainIntent : UiIntent {
     /** 機器との接続状態が変わった。ヘッダーの表示に使う。 */
     data class ConnectionStateChanged(val state: ConnectionState) : MainIntent
 
-    /** 不在着信の件数が変わった。下部バーの連絡先タブのバッジに使う。取得は MissedCallManager が行う。 */
+    /** 不在着信の件数が変わった。下部バーの連絡先タブのバッジに使う。Repository が取得し、UseCase 経由で購読する。 */
     data class MissedCallCountChanged(val count: Int) : MainIntent
 }

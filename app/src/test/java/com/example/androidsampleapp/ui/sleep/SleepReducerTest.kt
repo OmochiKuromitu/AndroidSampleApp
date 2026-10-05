@@ -1,6 +1,6 @@
 package com.example.androidsampleapp.ui.sleep
 
-import com.example.androidsampleapp.core.NoticeSnapshot
+import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination

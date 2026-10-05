@@ -35,7 +35,7 @@ class ContactReducer : Reducer<ContactState, ContactIntent> {
         // 押しただけでは消さない。確認してから。
         ContactIntent.ClearNoticesClicked -> state.copy(isClearConfirmVisible = true)
 
-        // 読み込み中かどうかは MissedCallManager が決めて NoticesChanged で戻る。先読みしない。
+        // 取得状況は Repository から NoticesChanged で戻る。先読みしない。
         ContactIntent.ClearNoticesConfirmed,
         ContactIntent.ClearNoticesDismissed,
         -> state.copy(isClearConfirmVisible = false)

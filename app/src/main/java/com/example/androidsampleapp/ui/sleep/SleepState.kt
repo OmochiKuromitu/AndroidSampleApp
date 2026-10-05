@@ -18,9 +18,9 @@ data class SleepState(
     val notices: List<Notice> = emptyList(),
     /** appstateholderからはいる通知 */
     val emergencyNotice: List<Notice> = emptyList(),
-    /** API の通知をまだ一度も受け取れておらず、失敗もしていない間。決めるのは MissedCallManager。 */
+    /** API の通知をまだ一度も受け取れておらず、失敗もしていない間。Repository の取得状況から決める。 */
     val isLoadingNotices: Boolean = false,
-    /** MissedCallManager の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
+    /** NoticeRepository の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
     val noticeLoadFailed: Boolean = false,
     /** 全消去の確認ダイアログを出しているか。誤操作で消さないよう、1 度だけ確かめる。 */
     val isClearConfirmVisible: Boolean = false,

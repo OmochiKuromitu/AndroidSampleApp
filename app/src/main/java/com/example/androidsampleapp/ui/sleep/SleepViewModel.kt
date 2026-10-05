@@ -2,12 +2,14 @@ package com.example.androidsampleapp.ui.sleep
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.androidsampleapp.core.MissedCallManager
+import com.example.androidsampleapp.domain.usecase.ClearNoticesUseCase
+import com.example.androidsampleapp.domain.usecase.ObserveNoticesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,14 +23,15 @@ import kotlinx.coroutines.launch
  * スリープ画面の ViewModel。
  *
  * - 1 秒ごとに時刻を整形して Ticked を投げる。
- * - 通知の一覧は MissedCallManager を購読するだけで、自分では取りに行かない（きっかけは AppNavigation）。
- *   確認ダイアログで消去を選ばれたら MissedCallManager に頼む。
+ * - 通知一覧は UseCase 経由で購読する。共通の取得のきっかけは AppNavigation。
+ *   確認ダイアログで消去を選ばれたら、消去の UseCase を呼ぶ。
  * - 解除スワイプが必要な距離に届いた瞬間と、通知がタップされたときに Effect を出す。
  *   どこへ行くかは AppNavigation が決める。
  */
 @HiltViewModel
 class SleepViewModel @Inject constructor(
-    private val missedCallManager: MissedCallManager,
+    observeNotices: ObserveNoticesUseCase,
+    private val clearNotices: ClearNoticesUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SleepState())
@@ -45,10 +48,10 @@ class SleepViewModel @Inject constructor(
     private val dateFormat = SimpleDateFormat("M月d日 (E)", Locale.JAPAN)
 
     init {
-        // 取得は MissedCallManager が行い、きっかけは AppNavigation が決める。ここは一覧を見るだけ。
+        // Repository が公開する共有一覧を UseCase 経由で購読する。
         // StateFlow なので、スリープに入る前に取れていた分も購読した時点で流れてくる。
         viewModelScope.launch {
-            missedCallManager.noticeSnapshot.collect { onIntent(SleepIntent.NoticesChanged(it)) }
+            observeNotices().collect { onIntent(SleepIntent.NoticesChanged(it)) }
         }
         viewModelScope.launch {
             while (isActive) {
@@ -80,9 +83,9 @@ class SleepViewModel @Inject constructor(
 
     private suspend fun handle(intent: SleepIntent, previous: SleepState, current: SleepState) {
         when (intent) {
-            // 結果は MissedCallManager の一覧の変化として NoticesChanged で戻る。
+            // 結果は購読側から NoticesChanged で戻る。
             // 押しただけの ClearNoticesClicked では消さない（確認ダイアログを出すだけ）。
-            SleepIntent.ClearNoticesConfirmed -> missedCallManager.clearNotices()
+            SleepIntent.ClearNoticesConfirmed -> clear()
 
             // 到達した瞬間の 1 回だけ復帰させる。指がさらに動いても重ねて送らない。
             is SleepIntent.UnlockDragged ->
@@ -99,6 +102,16 @@ class SleepViewModel @Inject constructor(
             is SleepIntent.NoticesChanged,
             is SleepIntent.Ticked,
             -> Unit
+        }
+    }
+
+    private suspend fun clear() {
+        try {
+            clearNotices()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 前回の一覧を残し、消去の失敗は NoticesChanged で受け取る。
         }
     }
 

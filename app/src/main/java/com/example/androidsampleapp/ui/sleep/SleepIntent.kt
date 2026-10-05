@@ -1,13 +1,13 @@
 package com.example.androidsampleapp.ui.sleep
 
-import com.example.androidsampleapp.core.NoticeSnapshot
+import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.Notice
 
 /**
  * スリープ画面の状態を変えうる入力の一覧。
  *
- * 時計の更新、MissedCallManager の一覧の変化、利用者の操作（消去、通知のタップ、解除スワイプ）を、
+ * 時計の更新、NoticeRepository の一覧の変化、利用者の操作（消去、通知のタップ、解除スワイプ）を、
  * すべてここから Reducer に通す。
  */
 sealed interface SleepIntent : UiIntent {
@@ -15,7 +15,7 @@ sealed interface SleepIntent : UiIntent {
     data class Ticked(val timeText: String, val dateText: String) : SleepIntent
 
     /**
-     * MissedCallManager の一覧の変化。取得・消去の結果も、その失敗もここに戻る。
+     * NoticeRepository の一覧の変化。取得・消去の結果も、その失敗もここに戻る。
      * 前回の値があれば、取り直しを待たずにまずそれが流れる。
      */
     data class NoticesChanged(val snapshot: NoticeSnapshot) : SleepIntent

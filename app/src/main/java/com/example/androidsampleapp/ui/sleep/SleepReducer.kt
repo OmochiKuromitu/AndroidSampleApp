@@ -5,7 +5,7 @@ import com.example.androidsampleapp.core.mvi.Reducer
 /**
  * スリープ画面の (状態, Intent) -> 次の状態。
  *
- * 純粋関数に保つ。時刻の取得、MissedCallManager への消去の依頼、解除の判定に応じた Effect は
+ * 純粋関数に保つ。時刻の取得、UseCase への消去の依頼、解除の判定に応じた Effect は
  * SleepViewModel が行う。
  */
 class SleepReducer : Reducer<SleepState, SleepIntent> {
@@ -19,7 +19,7 @@ class SleepReducer : Reducer<SleepState, SleepIntent> {
         // 押しただけでは消さない。確認してから。
         SleepIntent.ClearNoticesClicked -> state.copy(isClearConfirmVisible = true)
 
-        // 読み込み中かどうかは MissedCallManager が決めて NoticesChanged で戻る。先読みしない。
+        // 取得状況は Repository から NoticesChanged で戻る。先読みしない。
         SleepIntent.ClearNoticesConfirmed,
         SleepIntent.ClearNoticesDismissed,
         -> state.copy(isClearConfirmVisible = false)

@@ -52,9 +52,9 @@ data class ContactState(
     val missedCallCount: Int = 0,
     /** お知らせタブに出す一覧。持ち主は MissedCallManager で、ここにはその写しが入る。 */
     val notices: List<Notice> = emptyList(),
-    /** お知らせをまだ一度も受け取れておらず、失敗もしていない間。決めるのは MissedCallManager。 */
+    /** お知らせをまだ一度も受け取れておらず、失敗もしていない間。Repository の取得状況から決める。 */
     val isLoadingNotices: Boolean = false,
-    /** MissedCallManager の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
+    /** NoticeRepository の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
     val noticeLoadFailed: Boolean = false,
     /** お知らせの全消去の確認ダイアログを出しているか。スリープ画面と同じく、1 度だけ確かめる。 */
     val isClearConfirmVisible: Boolean = false,

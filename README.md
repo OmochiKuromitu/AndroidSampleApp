@@ -48,7 +48,7 @@ Android Studio でこのディレクトリを開く。実行構成は 4 つ（mo
         └─▶ core (共有状態の器, MVI の土台)
                      ▲                  │
                      └──────────────────┘
-                       共有状態への書き込みは data と、状態の持ち主（IdleTimer・各マネージャー）だけ
+                       共有データへの書き込みは data だけ。IdleTimer は自分の状態を持つ
 
         di      ─▶ interface と実装の結線
         config  ─▶ flavor 由来の設定（BuildConfig の読み口）
@@ -208,7 +208,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 | --- | --- | --- |
 | `IdleTimerViewModel` | `IdleTimer`（スリープ状態と操作） | `AppNavigation` |
 | `IncomingCallViewModel` | 着信の `StateFlow` | `IncomingCallRouter` |
-| `MissedCallViewModel` | `MissedCallManager` の取得の促し（不在着信の件数と通知一覧） | `AppNavigation` |
+| `MissedCallViewModel` | UseCase を通した不在着信の件数と通知一覧の取得 | `AppNavigation` |
 
 「`AppNavigation` が必要とするもの」という 1 つの入れ物にまとめない。それは責務ではなく、
 基準が無い入れ物は画面が増えるたびに無関係なものが同居して太る。
@@ -259,30 +259,27 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 
 ## HTTP で取るデータ — リポジトリの StateFlow
 
-電話帳・履歴（`ContactRepository.addressBook`）と API の通知（`NoticeRepository.notices`）は、
-取った結果をリポジトリが `MutableStateFlow` で持ち、`StateFlow` で公開する。
-ViewModel は `init` で購読し、値が流れるたびに Intent にして Reducer に通す。
-定期的に取る機器の状態（`AppStateHolder`）と同じ受け取り方に揃えてある。
+電話帳・履歴（`ContactRepository.addressBook`）、不在着信の件数
+（`ContactRepository.missedCallCount`）、通知と取得状況（`NoticeRepository.noticeSnapshot`）は、
+Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通して受け取り、
+値が流れるたびに Intent にして Reducer に通す。
 
 ```
-ViewModel.init
-  └─ ObserveXxxUseCase().filterNotNull().collect { dispatch(XxxChanged(it)) }
-
-ViewModel.handle(Started)
-  └─ RefreshXxxUseCase() ─▶ API ─▶ リポジトリの MutableStateFlow に入る ─▶ 上の collect に流れる
-       失敗したときだけ dispatch(LoadFailed)
+取得: ViewModel → 更新 UseCase → Repository → API → 共有状態を更新
+購読: 共有状態 → Repository の StateFlow → 購読 UseCase → ViewModel → Changed Intent → Reducer
 ```
 
-- **まだ一度も取れていない間は `null`。** 「まだ取っていない空」と「取ったら空だった」を分けるため。
-  ViewModel は `null` を捨て、State は「一度でも受け取れたか」のフラグを持つ。
-- **読み込み中は、そのフラグから決める**（`isLoading = !受け取り済み && !失敗`）。
-  「取り直しが終わったら読み込み中を解く」を Intent で待つと、`StateFlow` は同じ値を
-  入れ直しても流れないので、取り直した結果が前と同じだったときに止まる。
-- **リポジトリは `@Singleton` なので前回の値が残る。** 画面を開き直すと、取り直しを待たずに
-  前回の一覧がまず出て、取り直しが終われば差し替わる（スリープ画面は入るたびに ViewModel が
-  作り直されるが、通知はすぐ出る）。取り直しに失敗しても、受け取り済みの一覧は出したままにする。
-- 電話帳と履歴の取り直しのきっかけは、画面を開いたとき。API の通知は読み手が 2 画面あるので
-  ViewModel が直接は購読せず、`MissedCallManager` が購読して並べたものを見せる（第 2 部の「通知一覧 — MissedCallManager」）。
+- 電話帳・履歴は Repository 内に保持する。まだ一度も取れていなければ `null`。
+- 不在着信の件数と通知は `MissedCallManager` に保持し、Repository が読み書きする。
+  Manager は状態の器だけで、UseCase の呼び出し、コルーチンの起動、Flow の購読は行わない。
+- 通知は `domain/model/NoticeSnapshot` の `isLoaded` と `loadFailed` で
+  未取得・取得済みの空一覧・取得失敗を区別する。通知の並び替えと取得状況の更新は Repository が行う。
+- 取得済みの値は画面を開き直したときにもすぐ届く。失敗しても前回の件数・一覧を残す。
+- 通常の重複取得は Repository で間引く。既読・消去は待って実行し、操作と再取得を直列化する。
+  件数と通知の競合制御は別々なので、一方の操作で他方の取得を止めない。
+- 実行と購読は ViewModel の `viewModelScope` に従う。キャンセルは失敗として扱わず再送出する。
+  Manager の寿命に紐づいた常駐処理は作らない。
+- 電話帳・履歴は画面の生成時、不在着信の件数と通知は起動直後・タブ移動・スリープ表示時に取り直す。
   定期的な取り直しはしていない。
 
 ## ディレクトリ
@@ -496,55 +493,48 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 それ以外との間に線を引く。** フラグ付きの中はサーバから来た順のまま、それ以外は `occurredAt` の新しい順に並べる。
 分けて並べるのは表示の都合なので `ui/common/NoticeList` で行う。`pinned` が省かれた通知はフラグ無しとして読む。
 
-読み手が 2 画面あるので、一覧は `core/MissedCallManager`（`@Singleton`）が不在着信の件数と一緒に持つ。
-取得のきっかけは `AppNavigation` が決め、マネージャーは呼ばれたら取るだけ。
-画面の ViewModel は `noticeSnapshot` を購読するだけで、自分では取りに行かない。
+読み手が 2 画面あるので、一覧と取得状況は `core/MissedCallManager`（`@Singleton`）に保持する。
+取得のきっかけは `AppNavigation` が決め、`MissedCallViewModel` が
+`RefreshNoticesUseCase` を実行する。Manager は通信も購読も行わない。
 
-件数と一覧を 1 つのマネージャーに置いているのは、どちらも HTTP で取る共有の状態で、
-同じ節目（起動直後 / タブ移動 / スリープ画面が前に出た）に取り直すため。
-別々にしていたときは、`AppNavigation` が 3 か所すべてで 2 つの `refresh()` を並べて呼んでいた。
-今は `refresh()` 1 つで両方を取る。ただし実行中の要求は種類ごとに持つ
-（1 つにすると、通知の消去が件数の取得を打ち切る、といった無関係な取りやめが起きる）。
+件数と一覧は同じ節目（起動直後 / タブ移動 / スリープ画面が前に出た）に取り直すので、
+`MissedCallViewModel.refresh()` で 2 つの更新 UseCase を独立に実行する。
+一方の通信失敗で他方の取得を止めない。
 
 ```
-AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後）
-  └▶ MissedCallManager.refresh() ─▶ NoticeUseCase.refresh() ─▶ POST /notices/list
-                                  └▶ NoticeRepository.notices
-                                      └▶ noticeSnapshot: StateFlow<NoticeSnapshot>（新しい順の一覧 / 読み込み中 / 失敗）
-                                          ├▶ SleepViewModel   → NoticesChanged
-                                          └▶ ContactViewModel → NoticesChanged
+AppNavigation → MissedCallViewModel → RefreshNoticesUseCase → NoticeRepository
+  └▶ POST /notices/list → ドメインの型へ変換・新しい順に並べ替え → MissedCallManager に保存
+
+MissedCallManager.noticeSnapshot → NoticeRepository.noticeSnapshot → ObserveNoticesUseCase
+  ├▶ SleepViewModel   → NoticesChanged → Reducer → State
+  └▶ ContactViewModel → NoticesChanged → Reducer → State
 ```
 
-一覧の持ち主は `NoticeRepository` で、`MissedCallManager` は `NoticeUseCase` から購読して失敗の有無と合わせるだけ。
-`Notice.occurredAt` は表示用の文字列ではなく epoch ミリ秒で持ち、
-整形は `NoticeList` で行う（minSdk 24 なので `java.time` は使わない）。
+Repository が状態の読み書きを担当し、各画面は購読 UseCase の結果を見る。
+`Notice.occurredAt` は epoch ミリ秒で持ち、表示用の整形は `NoticeList` が行う。
 
-API は取得と消去の 2 本。`MissedCallManager` は `NoticeUseCase` を通して呼び、リポジトリは直接触らない。
-
-**UseCase は関心事ごとに 1 クラス。** 通知なら `NoticeUseCase` 1 つに、見る・取り直す・消すをまとめる。
-不在着信は `MissedCallUseCase`（件数を取る・既読にする）。
-どの API をどの順で呼ぶか（消去 → 取り直し、既読 → 件数の取り直し）は UseCase が決め、
-いつ呼ぶか、実行中の要求を間引くか打ち切るか、失敗をどう見せるかはマネージャーが決める。
+UseCase は他の画面と同じく操作ごとに分ける。通知は
+`ObserveNoticesUseCase`、`RefreshNoticesUseCase`、`ClearNoticesUseCase` の 3 つ。
+消去と再取得の順序・競合制御・共有状態への反映は `NoticeRepository` が担当する。
 
 ```
-XxxIntent.ClearNoticesClicked   ─▶ 確認ダイアログを出すだけ（まだ消さない）
-XxxIntent.ClearNoticesConfirmed ─▶ MissedCallManager.clearNotices() ─▶ NoticeUseCase.clear() ─▶ POST /notices/delete
-                                                                                            └▶ POST /notices/list（取り直し）
-                  結果は NoticeRepository.notices に入り、noticeSnapshot を通って NoticesChanged として流れる
-                  失敗も noticeSnapshot の loadFailed として同じ経路で流れる
+ClearNoticesClicked   → 確認ダイアログを出すだけ
+ClearNoticesConfirmed → ViewModel → ClearNoticesUseCase → NoticeRepository.deleteAllNotices()
+  └▶ POST /notices/delete → POST /notices/list → 共有状態 → ObserveNoticesUseCase → NoticesChanged
 ```
 
-消去が取り直しまで行うのは、消している間に届いた通知を落とさないため。
-呼び出し側は、API が 2 本であることを知らずに済む。
-取得も消去も同じ `noticeSnapshot` に戻るので、画面の経路は 1 本のままになる。
+消去後に取り直すのは、消している間に届いた通知を落とさないため。
+取得も消去も `noticeSnapshot` に戻り、失敗も同じ経路で各画面へ届く。
+読み込み中は `NoticeSnapshot.isLoading`（未取得かつ失敗していない間）で決める。
 
-読み込み中は `NoticeSnapshot.isLoading`（通知を一度も受け取れておらず、失敗もしていない間）で、
-第 1 部の「HTTP で取るデータ」と同じく「受け取れたか」から決める。
+通常の取得は実行中なら間引く。消去は実行中の取得が終わるのを待ち、
+消去と再取得の間に別の要求を割り込ませない。古い取得結果が消去後の一覧を上書きするのを防ぐ。
+失敗時は前回の一覧を残して失敗を記録し、次の画面切り替えで再試行する。
 
-`refresh()` は実行中の要求があれば何もしない（重なって遅い順に上書きされるのを防ぐ）。
-失敗しても前回の一覧を残し、失敗だけを立てる。明示的な再試行ボタンは置いていない
-（次に画面が切り替われば取り直す）。`clearNotices()` は利用者の操作なので取りやめず、
-実行中の取得があれば打ち切る。
+消去は操作した画面の `viewModelScope` で動き、ViewModel が破棄されると中断する。
+サーバ側で消去済みでも再取得前に中断した場合は、次の共通取得で状態を同期する。
+共通取得を担う `MissedCallViewModel` は `AppNavigation` で取得するため、
+通常は Activity と同じ寿命を持ち、個々のタブの非表示では中断しない。
 
 **通信は Retrofit + OkHttp、JSON は kotlinx.serialization。** `network/NoticeApi` が
 `POST {apiBaseUrl}/notices/list`（取得）と `POST {apiBaseUrl}/notices/delete`（消去）を叩き、
@@ -594,45 +584,31 @@ NoticeClicked ─▶ Reducer（状態は変えない）
 
 ## 不在着信のバッジ — MissedCallManager
 
-不在着信の件数は下部バーの連絡先タブと、連絡先画面の履歴タブの 2 か所が見る。
-読み手が複数いるので、`core/MissedCallManager` が保持する。
+不在着信の件数は下部バーの連絡先タブと、連絡先画面の履歴タブの 2 か所で見る。
+`MissedCallManager` に保持し、`ContactRepository` が読み書きする。
 
 ```
-AppNavigation（タブ移動 / スリープ画面が前に出た / 起動直後）
-  └▶ MissedCallManager.refresh() ─▶ MissedCallUseCase.getCount() ─▶ POST /missed-calls/count
-                                     └▶ missedCallCount: StateFlow
-                                         ├▶ MainViewModel   → 下部バーのバッジ
-                                         └▶ ContactViewModel → 履歴タブのバッジ
+AppNavigation → MissedCallViewModel → RefreshMissedCallCountUseCase → ContactRepository
+  └▶ POST /missed-calls/count → MissedCallManager に保存
 
-ContactViewModel（履歴タブを見せた）
-  └▶ MissedCallManager.markAsRead() ─▶ MissedCallUseCase.markAsRead() ─▶ POST /missed-calls/read
-                                                                        └▶ POST /missed-calls/count（取り直し）
-                                                                            └▶ 同じ StateFlow に戻る
+MissedCallManager.missedCallCount → ContactRepository.missedCallCount → ObserveMissedCallCountUseCase
+  ├▶ MainViewModel    → MissedCallCountChanged → Reducer → 下部バーのバッジ
+  └▶ ContactViewModel → MissedCallCountChanged → Reducer → 履歴タブのバッジ
+
+ContactViewModel（履歴を見せた）→ MarkMissedCallsAsReadUseCase → ContactRepository.markMissedCallsAsRead()
+  └▶ POST /missed-calls/read → POST /missed-calls/count → 同じ共有状態に戻る
 ```
 
-既読は履歴タブを見せた時点で呼ぶ。連絡先画面を履歴から開いたとき（通知経由）と、
-画面内で履歴タブに切り替えたときの 2 か所。件数で間引かないのは、件数がまだ届いていない
-タイミングで開かれると取りこぼすため。既読 API は何度呼んでも同じ結果になる前提。
+既読は履歴タブを見せた時点で呼ぶ。履歴から画面を開いたときと、画面内で履歴タブに切り替えたときの
+2 か所。まだ件数が届いていない場合もあるので、現在の件数による間引きはしない。
+既読後の再取得は Repository が行い、既読中に届いた分も反映する。Reducer は件数を先読みしない。
 
-既読のあとに取り直すのは、既読にしている間に届いた分を落とさないため
-（`MissedCallUseCase.markAsRead()` が決める。`NoticeUseCase.clear()` と同じ形）。Reducer は件数を先読みしない。先に 0 にすると、
-既読 API が失敗したときに件数が消えたままになる。
+通常の取得は同じ種類の要求が実行中なら間引く。既読は待って実行し、既読と再取得を直列化する。
+通信失敗では前回の件数を残す。通知用とは別のロックなので、通知の消去や取得に影響しない。
 
-**取得のきっかけは画面の切り替え。** HTTP なので黙っていても届かないが、タイマーで
-叩き続けるほどの鮮度は要らない。切り替わる節目で取れば足りる。きっかけを決めるのは
-`AppNavigation`（遷移を知っているのがそこだけだから）で、マネージャーは呼ばれたら取るだけ。
-
-`refresh()` は実行中の要求があれば何もしない。タブを続けて叩かれたときに、同じ要求が
-重なって遅い順に上書きされるのを防ぐため。失敗しても前回の件数を残す。通信が一度
-こけただけでバッジが消えると、不在着信を見落とす方に倒れる。
-
-`markAsRead()` は逆に取りやめない。利用者が履歴を見た結果なので、落とすと見たのに
-バッジが残る。実行中の取得があれば打ち切る（既読のあとに取り直すので、古い件数で
-上書きされるのを防ぐ）。
-
-ViewModel ではなく `@Singleton` なのは、画面をまたいで同じ件数を見せるため。
-保持は Hilt の `SingletonComponent` が行う（Application と同じ寿命）。`App` に
-手で持たせる必要はない。`IdleTimer` と同じ形。
+取得・既読は呼び出し元の ViewModel の寿命で動く。既読後の再取得前に中断した場合は、
+次の共通取得で同期する。`MissedCallManager` の Singleton は共有値を保持するためだけに使い、
+コルーチンや購読は持たない。
 
 ## 割り切っている点
 

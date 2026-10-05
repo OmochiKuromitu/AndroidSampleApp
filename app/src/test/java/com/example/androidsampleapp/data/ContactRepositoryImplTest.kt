@@ -1,6 +1,7 @@
 package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.config.AppConfig
+import com.example.androidsampleapp.core.MissedCallManager
 import com.example.androidsampleapp.di.NetworkModule
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runTest
@@ -40,7 +41,7 @@ class ContactRepositoryImplTest {
             NetworkModule.provideOkHttpClient(config),
             NetworkModule.provideJson(),
         )
-        repository = ContactRepositoryImpl(NetworkModule.provideContactApi(retrofit), config)
+        repository = ContactRepositoryImpl(NetworkModule.provideContactApi(retrofit), config, MissedCallManager())
     }
 
     @After
@@ -100,7 +101,8 @@ class ContactRepositoryImplTest {
     fun `不在着信の件数を POST で取る`() = runTest {
         server.enqueue(MockResponse().setBody("""{"count":3}"""))
 
-        assertEquals(3, repository.getMissedCallCount())
+        repository.refreshMissedCallCount()
+        assertEquals(3, repository.missedCallCount.value)
 
         val request = server.takeRequest()
         assertEquals("/api/missed-calls/count", request.path)
@@ -108,8 +110,9 @@ class ContactRepositoryImplTest {
     }
 
     @Test
-    fun `既読を POST で送る`() = runTest {
+    fun `既読を POST で送り、その間に届いた件数を取り直す`() = runTest {
         server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(MockResponse().setBody("""{"count":2}"""))
 
         repository.markMissedCallsAsRead()
 
@@ -117,6 +120,10 @@ class ContactRepositoryImplTest {
         assertEquals("POST", request.method)
         assertEquals("/api/missed-calls/read", request.path)
         assertEquals(DEVICE_BODY, request.body.readUtf8())
+        val countRequest = server.takeRequest()
+        assertEquals("/api/missed-calls/count", countRequest.path)
+        assertEquals(DEVICE_BODY, countRequest.body.readUtf8())
+        assertEquals(2, repository.missedCallCount.value)
     }
 
     private companion object {

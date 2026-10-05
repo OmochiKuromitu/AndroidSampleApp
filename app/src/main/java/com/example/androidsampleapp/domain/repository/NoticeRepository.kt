@@ -1,23 +1,26 @@
 package com.example.androidsampleapp.domain.repository
 
-import com.example.androidsampleapp.domain.model.Notice
+import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 通知は HTTP の API から取る。API は取得と消去の 2 本。
  *
- * 取った結果を [notices] に持つ。画面はこれを購読し、取り直された値がそのまま反映されるようにする。
+ * 取った結果と取得状況を [noticeSnapshot] に公開する。画面をまたいで同じ状態を購読する。
  */
 interface NoticeRepository {
-    /** 最後に取れた通知の一覧（新しいものが先頭）。まだ一度も取れていなければ null。 */
-    val notices: StateFlow<List<Notice>?>
+    /** 最後に取れた通知の一覧（新しいものが先頭）、取得済みかどうか、直近の失敗。 */
+    val noticeSnapshot: StateFlow<NoticeSnapshot>
 
     /**
-     * 取得 API を呼び、結果を [notices] に入れる。
-     * 失敗したら例外を投げ、[notices] は前回の値のまま残す。
+     * 取得 API を呼び、共有状態を更新する。実行中なら重ねて取得しない。
+     * 失敗したら例外を投げ、前回の一覧を残して失敗を記録する。
      */
     suspend fun refreshNotices()
 
-    /** 消去 API。サーバ側の一覧を空にする。[notices] は取り直すまで変わらない。 */
+    /**
+     * 消去して一覧を取り直す。取得中でも消去操作は取り落とさない。
+     * 消去と再取得の間に別の要求を割り込ませず、失敗時は前回の一覧を残して失敗を記録する。
+     */
     suspend fun deleteAllNotices()
 }

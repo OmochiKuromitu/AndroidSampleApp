@@ -1,6 +1,7 @@
 package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.config.AppConfig
+import com.example.androidsampleapp.core.MissedCallManager
 import com.example.androidsampleapp.di.NetworkModule
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
@@ -43,7 +44,7 @@ class NoticeRepositoryImplTest {
             NetworkModule.provideOkHttpClient(config),
             NetworkModule.provideJson(),
         )
-        repository = NoticeRepositoryImpl(NetworkModule.provideNoticeApi(retrofit), config)
+        repository = NoticeRepositoryImpl(NetworkModule.provideNoticeApi(retrofit), config, MissedCallManager())
     }
 
     @After
@@ -52,8 +53,9 @@ class NoticeRepositoryImplTest {
     }
 
     @Test
-    fun `取り直すまでは一覧が null`() {
-        assertNull(repository.notices.value)
+    fun `取り直すまでは未取得で読み込み中`() {
+        assertFalse(repository.noticeSnapshot.value.isLoaded)
+        assertTrue(repository.noticeSnapshot.value.isLoading)
     }
 
     @Test
@@ -77,7 +79,7 @@ class NoticeRepositoryImplTest {
         assertEquals("/api/notices/list", request.path)
         assertEquals(EXPECTED_BODY, request.body.readUtf8())
 
-        val notices = repository.notices.value!!
+        val notices = repository.noticeSnapshot.value.notices
         assertEquals(listOf("1", "2"), notices.map { it.id })
         assertEquals(NoticeCategory.ALERT, notices[0].category)
         assertEquals(NoticeDestination.Aircon, notices[0].destination)
@@ -89,10 +91,11 @@ class NoticeRepositoryImplTest {
     }
 
     @Test
-    fun `POST notices-delete を呼ぶ。一覧は取り直すまで変わらない`() = runTest {
-        // 消去と取り直しをまとめるのは MissedCallManager.clearNotices() の役目。リポジトリは呼ばれた API だけを反映する。
+    fun `POST notices-delete のあとに取り直し、消去中に届いた通知も反映する`() = runTest {
+        // 消去と再取得の順序、共有状態への反映は Repository が担当する。
         server.enqueue(MockResponse().setBody("""[{"id":"1","category":"INFO","message":"m","occurredAt":1,"destination":"TOP"}]"""))
         server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(MockResponse().setBody("""[{"id":"new","category":"INFO","message":"m","occurredAt":2,"destination":"TOP"}]"""))
         repository.refreshNotices()
         server.takeRequest()
 
@@ -102,7 +105,10 @@ class NoticeRepositoryImplTest {
         assertEquals("POST", request.method)
         assertEquals("/api/notices/delete", request.path)
         assertEquals(EXPECTED_BODY, request.body.readUtf8())
-        assertEquals(1, repository.notices.value?.size)
+        val listRequest = server.takeRequest()
+        assertEquals("/api/notices/list", listRequest.path)
+        assertEquals(EXPECTED_BODY, listRequest.body.readUtf8())
+        assertEquals(listOf("new"), repository.noticeSnapshot.value.notices.map { it.id })
     }
 
     @Test
@@ -118,7 +124,9 @@ class NoticeRepositoryImplTest {
             assertEquals(500, e.code())
         }
 
-        assertEquals(listOf("1"), repository.notices.value?.map { it.id })
+        assertEquals(listOf("1"), repository.noticeSnapshot.value.notices.map { it.id })
+        assertTrue(repository.noticeSnapshot.value.loadFailed)
+        assertFalse(repository.noticeSnapshot.value.isLoading)
     }
 
     @Test
@@ -128,7 +136,9 @@ class NoticeRepositoryImplTest {
 
         repository.refreshNotices()
 
-        assertTrue(repository.notices.value!!.isEmpty())
+        assertTrue(repository.noticeSnapshot.value.notices.isEmpty())
+        assertTrue(repository.noticeSnapshot.value.isLoaded)
+        assertFalse(repository.noticeSnapshot.value.isLoading)
     }
 
     private companion object {
