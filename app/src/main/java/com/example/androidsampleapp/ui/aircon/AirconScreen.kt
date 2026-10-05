@@ -76,7 +76,7 @@ fun AirconScreen(
         )
 
         TemperatureControl(
-            targetTemperature = state.aircon.targetTemperature,
+            targetTemperature = state.settings.targetTemperature,
             enabled = state.isOperable && state.aircon.isOn,
             onDown = onTemperatureDownClick,
             onUp = onTemperatureUpClick,
@@ -86,7 +86,7 @@ fun AirconScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.dimensions.spaceSmall)) {
             AirconMode.entries.forEach { mode ->
                 FilterChip(
-                    selected = mode == state.aircon.mode,
+                    selected = mode == state.settings.mode,
                     onClick = { onModeSelect(mode) },
                     enabled = state.isOperable && state.aircon.isOn,
                     label = { Text(stringResource(mode.labelRes())) },

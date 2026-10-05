@@ -293,7 +293,7 @@ app/src/main/java/com/example/androidsampleapp/
 │   └── mvi/                UiState / UiIntent / UiEffect / Reducer
 ├── di/                     Hilt モジュール（AppModule / NetworkModule / RepositoryModule / Qualifiers）
 ├── domain/
-│   ├── model/              Aircon / AirconSpec / ConnectionState / IncomingCall / Notice
+│   ├── model/              Aircon / AirconSettings / AirconSpec / ConnectionState / IncomingCall / Notice
 │   ├── repository/         DeviceRepository / AirconRepository / NoticeRepository / ContactRepository（interface）
 │   └── usecase/            ObserveXxx / SetXxx / AnswerCall …
 ├── data/                   Repository 実装
@@ -377,6 +377,27 @@ Reducer は Android に依存しない純粋な処理なので、JVM テスト�
 書き手は `IdleTimer` だけ、読み手も `AppNavigation` だけなので、共有の器を通す理由がない。
 通すと、状態を持つ場所と更新を決める場所が分かれてしまい、
 `IdleTimer` を読むだけではスリープの挙動が追えなくなる。
+
+## エアコンの温度・モード — プロセス内のメモリ保持
+
+エアコン画面の温度とモードは、`AirconRepository.settings` から受け取る。
+未設定の項目は `AirconSettings` のデフォルト（26℃・冷房）を使い、設定 API が成功したら
+その項目だけを応答の値で更新する。失敗した操作では保存値を変えない。
+
+`AirconRepositoryImpl` は Hilt の Singleton なので、画面や ViewModel を作り直しても同じ値を使う。
+保存先は `MutableStateFlow` だけで、ファイルには書かない。プロセス終了・再起動で値が消え、
+次の起動はデフォルトから始まる。画面の再表示時は保存値を表示するだけで、設定 API を再送しない。
+
+```
+設定: AirconViewModel → 設定 UseCase → AirconRepository → API成功 → settings に保存
+表示: settings → ObserveAirconSettingsUseCase → SettingsChanged → Reducer → AirconState.settings
+```
+
+温度の上げ下げも、この保存値を基準にする。ViewModel の初期 State には現在の保存値を入れておき、
+購読が始まる前から復元した値を表示する。
+
+機器の現在値（`AirconRepository.aircon`）とは別に保持する。定期取得や電源操作の応答で
+保存した温度・モードを上書きしない。電源と室温、トップ画面の機器状態は引き続き現在値を表示する。
 
 ## 状態の定期取得
 
