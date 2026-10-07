@@ -39,8 +39,9 @@ class MissedCallViewModel @Inject constructor(
 
     private fun relaunch(previous: Job?, request: suspend () -> Unit): Job =
         viewModelScope.launch {
-            // 前の要求が Repository のロックを外すまで待つ。待たずに投げると、
-            // 実行中とみなされて新しい方が間引かれる。
+            // 実行中の前の要求をキャンセルし、新しい要求を優先する。
+            // キャンセル後に終わるまで待つのは、前の要求が Repository のロックを外す前に投げると、
+            // 実行中とみなされて新しい方まで間引かれ、どちらも取得しなくなるため。
             previous?.cancelAndJoin()
             try {
                 request()
