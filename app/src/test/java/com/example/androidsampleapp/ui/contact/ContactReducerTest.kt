@@ -1,6 +1,5 @@
 package com.example.androidsampleapp.ui.contact
 
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.CallHistory
 import com.example.androidsampleapp.domain.model.Contact
@@ -118,35 +117,16 @@ class ContactReducerTest {
     }
 
     @Test
-    fun `お知らせの一覧と読み込み状態を取り込む`() {
-        val next = reducer.reduce(
-            ContactState(isLoadingNotices = true),
-            ContactIntent.NoticesChanged(NoticeSnapshot(notices = notices, isLoaded = true)),
-        )
+    fun `お知らせの一覧を取り込む`() {
+        val next = reducer.reduce(ContactState(), ContactIntent.NoticesChanged(notices))
 
         assertEquals(notices, next.notices)
-        assertFalse(next.isLoadingNotices)
-        assertFalse(next.noticeLoadFailed)
-    }
-
-    @Test
-    fun `お知らせをまだ受け取っていなければお知らせだけ読み込み中になる`() {
-        val state = ContactState(contacts = contacts, histories = histories, isAddressBookLoaded = true)
-
-        val next = reducer.reduce(state, ContactIntent.NoticesChanged(NoticeSnapshot()))
-
-        assertTrue(next.isLoadingNotices)
-        assertFalse(next.isLoading)
     }
 
     @Test
     fun `お知らせの変化は電話帳と履歴の読み込み状態に触らない`() {
-        val next = reducer.reduce(
-            ContactState(),
-            ContactIntent.NoticesChanged(NoticeSnapshot(loadFailed = true)),
-        )
+        val next = reducer.reduce(ContactState(), ContactIntent.NoticesChanged(emptyList()))
 
-        assertTrue(next.noticeLoadFailed)
         assertTrue(next.isLoading)
         assertFalse(next.loadFailed)
     }
@@ -161,7 +141,7 @@ class ContactReducerTest {
     }
 
     @Test
-    fun `お知らせの消去ではいを押したらダイアログを閉じる。読み込み中は先読みしない`() {
+    fun `お知らせの消去ではいを押したらダイアログを閉じる。一覧は先に空にしない`() {
         val state = ContactState(notices = notices, isClearConfirmVisible = true)
 
         val next = reducer.reduce(state, ContactIntent.ClearNoticesConfirmed)

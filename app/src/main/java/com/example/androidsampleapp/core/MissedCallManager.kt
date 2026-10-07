@@ -1,12 +1,11 @@
 package com.example.androidsampleapp.core
 
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
+import com.example.androidsampleapp.domain.model.Notice
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 /**
  * 不在着信の件数と通知一覧を、画面をまたいで保持する共有状態の器。
@@ -21,14 +20,14 @@ class MissedCallManager @Inject constructor() {
     private val _missedCallCount = MutableStateFlow(0)
     val missedCallCount: StateFlow<Int> = _missedCallCount.asStateFlow()
 
-    private val _noticeSnapshot = MutableStateFlow(NoticeSnapshot())
-    val noticeSnapshot: StateFlow<NoticeSnapshot> = _noticeSnapshot.asStateFlow()
+    private val _notices = MutableStateFlow<List<Notice>>(emptyList())
+    val notices: StateFlow<List<Notice>> = _notices.asStateFlow()
 
     internal fun updateMissedCallCount(count: Int) {
         _missedCallCount.value = count
     }
 
-    internal fun updateNoticeSnapshot(transform: (NoticeSnapshot) -> NoticeSnapshot) {
-        _noticeSnapshot.update(transform)
+    internal fun updateNotices(notices: List<Notice>) {
+        _notices.value = notices
     }
 }

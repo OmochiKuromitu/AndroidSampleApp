@@ -11,7 +11,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,31 +94,25 @@ class NotificationRepositoryStateTest {
         advanceUntilIdle()
 
         assertEquals(listOf("list"), fixture.noticeApi.calls)
-        assertEquals(listOf("new", "old"), repository.noticeSnapshot.value.notices.map { it.id })
-        assertSame(fixture.manager.noticeSnapshot, repository.noticeSnapshot)
+        assertEquals(listOf("new", "old"), repository.notices.value.map { it.id })
+        assertSame(fixture.manager.notices, repository.notices)
     }
 
     @Test
-    fun `初回の失敗と再試行と取得済みの空一覧を区別する`() = runTest {
+    fun `取得に失敗したら一覧を空にし、次に取れたら一覧が入る`() = runTest {
         val fixture = NotificationTestFixture()
         val repository = fixture.noticeRepository
-        assertTrue(repository.noticeSnapshot.value.isLoading)
+        assertTrue(repository.notices.value.isEmpty())
+        repository.refreshNotices()
+        assertEquals(listOf("old"), repository.notices.value.map { it.id })
+
         fixture.noticeApi.failOnGet = true
         assertTrue(runCatching { repository.refreshNotices() }.exceptionOrNull() is IOException)
-        assertTrue(repository.noticeSnapshot.value.loadFailed)
-        assertFalse(repository.noticeSnapshot.value.isLoading)
-        assertFalse(repository.noticeSnapshot.value.isLoaded)
+        assertTrue(repository.notices.value.isEmpty())
 
         fixture.noticeApi.failOnGet = false
-        fixture.noticeApi.notices = emptyList()
-        launch { repository.refreshNotices() }
-        runCurrent()
-        assertTrue(repository.noticeSnapshot.value.isLoading)
-        assertFalse(repository.noticeSnapshot.value.loadFailed)
-        advanceUntilIdle()
-        assertTrue(repository.noticeSnapshot.value.isLoaded)
-        assertTrue(repository.noticeSnapshot.value.notices.isEmpty())
-        assertFalse(repository.noticeSnapshot.value.isLoading)
+        repository.refreshNotices()
+        assertEquals(listOf("old"), repository.notices.value.map { it.id })
     }
 
     @Test
@@ -127,12 +120,11 @@ class NotificationRepositoryStateTest {
         val fixture = NotificationTestFixture()
         val repository = fixture.noticeRepository
         repository.refreshNotices()
-        val previous = repository.noticeSnapshot.value
+        val previous = repository.notices.value
         launch { repository.refreshNotices() }
         runCurrent()
 
-        assertEquals(previous, repository.noticeSnapshot.value)
-        assertFalse(repository.noticeSnapshot.value.isLoading)
+        assertEquals(previous, repository.notices.value)
         advanceUntilIdle()
     }
 
@@ -149,7 +141,7 @@ class NotificationRepositoryStateTest {
         advanceUntilIdle()
 
         assertEquals(listOf("list", "delete", "list"), fixture.noticeApi.calls)
-        assertEquals(listOf("new"), repository.noticeSnapshot.value.notices.map { it.id })
+        assertEquals(listOf("new"), repository.notices.value.map { it.id })
 
         launch { repository.deleteAllNotices() }
         runCurrent()
@@ -159,7 +151,7 @@ class NotificationRepositoryStateTest {
     }
 
     @Test
-    fun `消去に失敗したら一覧を残して失敗を記録し、取り直さない`() = runTest {
+    fun `消去に失敗したら一覧を空にし、取り直さない`() = runTest {
         val fixture = NotificationTestFixture()
         val repository = fixture.noticeRepository
         repository.refreshNotices()
@@ -167,9 +159,7 @@ class NotificationRepositoryStateTest {
         assertTrue(runCatching { repository.deleteAllNotices() }.exceptionOrNull() is IOException)
 
         assertEquals(listOf("list", "delete"), fixture.noticeApi.calls)
-        assertEquals(listOf("old"), repository.noticeSnapshot.value.notices.map { it.id })
-        assertTrue(repository.noticeSnapshot.value.loadFailed)
-        assertFalse(repository.noticeSnapshot.value.isLoading)
+        assertTrue(repository.notices.value.isEmpty())
     }
 
     @Test
@@ -187,35 +177,33 @@ class NotificationRepositoryStateTest {
         launch { fixture.noticeRepository.deleteAllNotices() }
         advanceUntilIdle()
         assertEquals(5, fixture.contactRepository.missedCallCount.value)
-        assertTrue(fixture.noticeRepository.noticeSnapshot.value.isLoaded)
+        assertEquals(listOf("delete", "list"), fixture.noticeApi.calls)
 
+        fixture.noticeApi.notices = listOf(noticeResponse("new", 300))
         launch { fixture.noticeRepository.refreshNotices() }
         launch { fixture.contactRepository.markMissedCallsAsRead() }
         advanceUntilIdle()
         assertEquals(0, fixture.contactRepository.missedCallCount.value)
-        assertFalse(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
+        assertEquals(listOf("new"), fixture.noticeRepository.notices.value.map { it.id })
     }
 
     @Test
-    fun `キャンセルは取得失敗にせず、ロックを解放して再取得できる`() = runTest {
+    fun `キャンセルは取得失敗にせず一覧を空にしない。ロックを解放して再取得できる`() = runTest {
         val fixture = NotificationTestFixture()
-        fixture.noticeApi.failOnGet = true
-        runCatching { fixture.noticeRepository.refreshNotices() }
-        fixture.noticeApi.failOnGet = false
+        fixture.noticeRepository.refreshNotices()
         val countJob = launch { fixture.contactRepository.refreshMissedCallCount() }
         val noticeJob = launch { fixture.noticeRepository.refreshNotices() }
         runCurrent()
-        assertFalse(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
         countJob.cancelAndJoin()
         noticeJob.cancelAndJoin()
 
         assertEquals(0, fixture.contactRepository.missedCallCount.value)
-        assertTrue(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
-        assertFalse(fixture.noticeRepository.noticeSnapshot.value.isLoaded)
+        assertEquals(listOf("old"), fixture.noticeRepository.notices.value.map { it.id })
+        fixture.noticeApi.notices = listOf(noticeResponse("new", 300))
         fixture.contactRepository.refreshMissedCallCount()
         fixture.noticeRepository.refreshNotices()
         assertEquals(5, fixture.contactRepository.missedCallCount.value)
-        assertFalse(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
+        assertEquals(listOf("new"), fixture.noticeRepository.notices.value.map { it.id })
     }
 
     @Test
@@ -223,7 +211,7 @@ class NotificationRepositoryStateTest {
         val fixture = NotificationTestFixture()
         fixture.contactRepository.refreshMissedCallCount()
         fixture.noticeRepository.refreshNotices()
-        val previous = fixture.noticeRepository.noticeSnapshot.value
+        val previous = fixture.noticeRepository.notices.value
         fixture.contactApi.countResponse = {
             withContext(NonCancellable) { delay(100); 99 }
         }
@@ -238,6 +226,6 @@ class NotificationRepositoryStateTest {
         advanceUntilIdle()
 
         assertEquals(5, fixture.contactRepository.missedCallCount.value)
-        assertEquals(previous, fixture.noticeRepository.noticeSnapshot.value)
+        assertEquals(previous, fixture.noticeRepository.notices.value)
     }
 }

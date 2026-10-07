@@ -14,14 +14,10 @@ data class SleepState(
     val timeText: String = "",
     /** 表示用に整形済みの日付（「9月10日 (水)」）。 */
     val dateText: String = "",
-    /** 一覧に出す通知。持ち主は MissedCallManager で、ここにはその写しが入る。 */
+    /** 一覧に出す通知。持ち主は MissedCallManager で、ここにはその写しが入る。取得に失敗したら空。 */
     val notices: List<Notice> = emptyList(),
     /** appstateholderからはいる通知 */
     val emergencyNotice: List<Notice> = emptyList(),
-    /** API の通知をまだ一度も受け取れておらず、失敗もしていない間。Repository の取得状況から決める。 */
-    val isLoadingNotices: Boolean = false,
-    /** NoticeRepository の直近の取得（または消去）に失敗した。受け取り済みの一覧は [notices] に残る。 */
-    val noticeLoadFailed: Boolean = false,
     /** 全消去の確認ダイアログを出しているか。誤操作で消さないよう、1 度だけ確かめる。 */
     val isClearConfirmVisible: Boolean = false,
     /**

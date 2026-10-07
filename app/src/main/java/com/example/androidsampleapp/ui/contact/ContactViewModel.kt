@@ -147,7 +147,7 @@ class ContactViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // 件数は前回値を残し、通知の失敗は NoticesChanged で受け取る。
+            // 件数は前回値を残す。通知は失敗したら空の一覧が NoticesChanged で届く。
         }
     }
 }

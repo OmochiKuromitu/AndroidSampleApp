@@ -1,6 +1,5 @@
 package com.example.androidsampleapp.ui.sleep
 
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.domain.model.Notice
 import com.example.androidsampleapp.domain.model.NoticeCategory
 import com.example.androidsampleapp.domain.model.NoticeDestination
@@ -21,24 +20,10 @@ class SleepReducerTest {
         Notice(id, NoticeCategory.CALL, null, "玄関から呼び出し", occurredAt, NoticeDestination.Top)
 
     @Test
-    fun `一覧の変化で通知と読み込み状態が入る`() {
-        val next = reducer.reduce(
-            SleepState(isLoadingNotices = true),
-            SleepIntent.NoticesChanged(
-                NoticeSnapshot(notices = notices, isLoaded = true, loadFailed = true),
-            ),
-        )
+    fun `一覧の変化で通知が入る`() {
+        val next = reducer.reduce(SleepState(), SleepIntent.NoticesChanged(notices))
 
         assertEquals(notices, next.notices)
-        assertFalse(next.isLoadingNotices)
-        assertTrue(next.noticeLoadFailed)
-    }
-
-    @Test
-    fun `まだ受け取っていないスナップショットなら読み込み中になる`() {
-        val next = reducer.reduce(SleepState(), SleepIntent.NoticesChanged(NoticeSnapshot()))
-
-        assertTrue(next.isLoadingNotices)
     }
 
     @Test
@@ -51,7 +36,7 @@ class SleepReducerTest {
     }
 
     @Test
-    fun `はいを押したらダイアログを閉じる。読み込み中は先読みしない`() {
+    fun `はいを押したらダイアログを閉じる。一覧は先に空にしない`() {
         // 読み込み中かどうかは MissedCallManager が決めて NoticesChanged で戻る。
         val state = SleepState(notices = notices, isClearConfirmVisible = true)
 

@@ -1,6 +1,5 @@
 package com.example.androidsampleapp.ui.contact
 
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.AddressBook
 import com.example.androidsampleapp.domain.model.Notice
@@ -30,8 +29,8 @@ sealed interface ContactIntent : UiIntent {
     /** 不在着信の件数の変化。Repository が取得し、UseCase 経由で購読する。 */
     data class MissedCallCountChanged(val count: Int) : ContactIntent
 
-    /** お知らせの一覧の変化。取得・消去の結果も、その失敗もここに戻る。Repository が取得し、UseCase 経由で購読する。 */
-    data class NoticesChanged(val snapshot: NoticeSnapshot) : ContactIntent
+    /** お知らせの一覧の変化。取得・消去の結果もここに戻る（失敗したら空）。Repository が取得し、UseCase 経由で購読する。 */
+    data class NoticesChanged(val notices: List<Notice>) : ContactIntent
 
     /** お知らせタブの消去ボタンを押した。まだ消さず、確認ダイアログを出す。 */
     data object ClearNoticesClicked : ContactIntent

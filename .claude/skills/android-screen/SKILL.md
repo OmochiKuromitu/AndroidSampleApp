@@ -243,8 +243,8 @@ data class NavigateToAircon(...) : SleepEffect
 
 HTTP のように能動的に取りに行くものは、取得のきっかけを `AppNavigation` が決め、
 マネージャーは呼ばれたら取るだけにする。各画面がそれぞれ叩くと、画面が増えるたびに
-取得のタイミングが散る。実行中の要求が重ならないよう `refresh()` 側で間引くこと。
-見本は `core/MissedCallManager`。
+取得のタイミングが散る。要求が重なったら呼ぶ側（`MissedCallViewModel`）が前の Job を `cancelAndJoin()` してから投げ直し、新しい要求の結果を出すこと。
+見本は `ui/navigation/MissedCallViewModel`。
 
 共有の器は書き手が複数いて初めて元が取れる。書き手が 1 つなら、そのクラスに持たせる。
 過去に「全画面が見るから」で `AppStateHolder` にスリープ状態を入れて、状態を持つ場所と

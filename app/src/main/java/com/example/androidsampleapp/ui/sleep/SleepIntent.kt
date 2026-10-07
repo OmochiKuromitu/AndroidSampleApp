@@ -1,6 +1,5 @@
 package com.example.androidsampleapp.ui.sleep
 
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.Notice
 
@@ -15,10 +14,10 @@ sealed interface SleepIntent : UiIntent {
     data class Ticked(val timeText: String, val dateText: String) : SleepIntent
 
     /**
-     * NoticeRepository の一覧の変化。取得・消去の結果も、その失敗もここに戻る。
+     * NoticeRepository の一覧の変化。取得・消去の結果もここに戻る。失敗したら空の一覧が流れる。
      * 前回の値があれば、取り直しを待たずにまずそれが流れる。
      */
-    data class NoticesChanged(val snapshot: NoticeSnapshot) : SleepIntent
+    data class NoticesChanged(val notices: List<Notice>) : SleepIntent
 
     /** 消去ボタンを押した。まだ消さず、確認ダイアログを出す。 */
     data object ClearNoticesClicked : SleepIntent

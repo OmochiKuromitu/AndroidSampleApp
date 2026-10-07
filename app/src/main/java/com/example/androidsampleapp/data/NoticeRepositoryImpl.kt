@@ -3,7 +3,6 @@ package com.example.androidsampleapp.data
 import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.core.MissedCallManager
 import com.example.androidsampleapp.domain.model.Notice
-import com.example.androidsampleapp.domain.model.NoticeSnapshot
 import com.example.androidsampleapp.domain.repository.NoticeRepository
 import com.example.androidsampleapp.model.DeviceRequest
 import com.example.androidsampleapp.model.NoticeResponse
@@ -20,8 +19,9 @@ import kotlinx.coroutines.sync.withLock
  * 通知は HTTP の API（[NoticeApi]）から取る。定期的に取る機器の状態とは別の API なので、
  * AppStateHolder は通らない。
  *
- * 結果と取得状況は MissedCallManager に反映し、[noticeSnapshot] として公開する。
- * 一覧の並び替え、失敗時の前回値の保持、取得と消去の競合制御もここで行う。
+ * 結果は MissedCallManager に反映し、[notices] として公開する。
+ * 一覧の並び替え、失敗時に一覧を空にすること、取得と消去の競合制御もここで行う。
+ * 失敗しても古い一覧を出し続けると、取れていないことに画面から気づけないため空にする。
  * コルーチンは作らず、呼び出し元の寿命で実行する。
  *
  * API はどの端末からの要求かを本文で名乗らせる。端末の ID は [AppConfig.deviceId] から詰める。
@@ -37,7 +37,7 @@ class NoticeRepositoryImpl @Inject constructor(
     private val missedCallManager: MissedCallManager,
 ) : NoticeRepository {
 
-    override val noticeSnapshot = missedCallManager.noticeSnapshot
+    override val notices = missedCallManager.notices
     private val noticeMutex = Mutex()
 
     override suspend fun refreshNotices() {
@@ -57,23 +57,18 @@ class NoticeRepositoryImpl @Inject constructor(
     }
 
     private suspend fun requestNotices(beforeFetch: suspend () -> Unit = {}) {
-        val previousFailure = noticeSnapshot.value.loadFailed
-        missedCallManager.updateNoticeSnapshot { it.copy(loadFailed = false) }
         try {
             beforeFetch()
-            val notices = api.getNotices(request())
+            val fetched = api.getNotices(request())
                 .map { it.toDomain() }
                 .sortedByDescending { it.occurredAt }
             currentCoroutineContext().ensureActive()
-            missedCallManager.updateNoticeSnapshot {
-                NoticeSnapshot(notices = notices, isLoaded = true)
-            }
+            missedCallManager.updateNotices(fetched)
         } catch (e: CancellationException) {
-            // キャンセルは取得失敗にしない。要求前の失敗状況に戻す。
-            missedCallManager.updateNoticeSnapshot { it.copy(loadFailed = previousFailure) }
+            // キャンセルは取得失敗にしない。後から投げた要求が一覧を書く。
             throw e
         } catch (e: Exception) {
-            missedCallManager.updateNoticeSnapshot { it.copy(loadFailed = true) }
+            missedCallManager.updateNotices(emptyList())
             throw e
         }
     }

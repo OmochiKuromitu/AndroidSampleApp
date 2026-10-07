@@ -53,9 +53,8 @@ class NoticeRepositoryImplTest {
     }
 
     @Test
-    fun `取り直すまでは未取得で読み込み中`() {
-        assertFalse(repository.noticeSnapshot.value.isLoaded)
-        assertTrue(repository.noticeSnapshot.value.isLoading)
+    fun `取り直すまでは空`() {
+        assertTrue(repository.notices.value.isEmpty())
     }
 
     @Test
@@ -79,7 +78,7 @@ class NoticeRepositoryImplTest {
         assertEquals("/api/notices/list", request.path)
         assertEquals(EXPECTED_BODY, request.body.readUtf8())
 
-        val notices = repository.noticeSnapshot.value.notices
+        val notices = repository.notices.value
         assertEquals(listOf("1", "2"), notices.map { it.id })
         assertEquals(NoticeCategory.ALERT, notices[0].category)
         assertEquals(NoticeDestination.Aircon, notices[0].destination)
@@ -108,11 +107,11 @@ class NoticeRepositoryImplTest {
         val listRequest = server.takeRequest()
         assertEquals("/api/notices/list", listRequest.path)
         assertEquals(EXPECTED_BODY, listRequest.body.readUtf8())
-        assertEquals(listOf("new"), repository.noticeSnapshot.value.notices.map { it.id })
+        assertEquals(listOf("new"), repository.notices.value.map { it.id })
     }
 
     @Test
-    fun `取得に失敗したら例外を投げ、前回の一覧を残す`() = runTest {
+    fun `取得に失敗したら例外を投げ、一覧を空にする`() = runTest {
         server.enqueue(MockResponse().setBody("""[{"id":"1","category":"INFO","message":"m","occurredAt":1,"destination":"TOP"}]"""))
         server.enqueue(MockResponse().setResponseCode(500))
         repository.refreshNotices()
@@ -124,21 +123,18 @@ class NoticeRepositoryImplTest {
             assertEquals(500, e.code())
         }
 
-        assertEquals(listOf("1"), repository.noticeSnapshot.value.notices.map { it.id })
-        assertTrue(repository.noticeSnapshot.value.loadFailed)
-        assertFalse(repository.noticeSnapshot.value.isLoading)
+        assertTrue(repository.notices.value.isEmpty())
     }
 
     @Test
     fun `空の配列なら空の一覧が入る`() = runTest {
-        // 「まだ取っていない（null）」と「取ったら空だった」を分ける。
+        server.enqueue(MockResponse().setBody("""[{"id":"1","category":"INFO","message":"m","occurredAt":1,"destination":"TOP"}]"""))
         server.enqueue(MockResponse().setBody("[]"))
+        repository.refreshNotices()
 
         repository.refreshNotices()
 
-        assertTrue(repository.noticeSnapshot.value.notices.isEmpty())
-        assertTrue(repository.noticeSnapshot.value.isLoaded)
-        assertFalse(repository.noticeSnapshot.value.isLoading)
+        assertTrue(repository.notices.value.isEmpty())
     }
 
     private companion object {

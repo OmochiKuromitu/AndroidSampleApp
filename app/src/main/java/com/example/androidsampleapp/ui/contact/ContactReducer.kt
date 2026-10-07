@@ -23,11 +23,7 @@ class ContactReducer : Reducer<ContactState, ContactIntent> {
 
         is ContactIntent.MissedCallCountChanged -> state.copy(missedCallCount = intent.count)
 
-        is ContactIntent.NoticesChanged -> state.copy(
-            notices = intent.snapshot.notices,
-            isLoadingNotices = intent.snapshot.isLoading,
-            noticeLoadFailed = intent.snapshot.loadFailed,
-        )
+        is ContactIntent.NoticesChanged -> state.copy(notices = intent.notices)
 
         // 取得済みの一覧を出し分けるだけなので、通信は起きない。
         is ContactIntent.ListSelected -> state.copy(selectedList = intent.list)
@@ -35,7 +31,7 @@ class ContactReducer : Reducer<ContactState, ContactIntent> {
         // 押しただけでは消さない。確認してから。
         ContactIntent.ClearNoticesClicked -> state.copy(isClearConfirmVisible = true)
 
-        // 取得状況は Repository から NoticesChanged で戻る。先読みしない。
+        // 消した結果は Repository から NoticesChanged で戻る。先に一覧を空にしない。
         ContactIntent.ClearNoticesConfirmed,
         ContactIntent.ClearNoticesDismissed,
         -> state.copy(isClearConfirmVisible = false)

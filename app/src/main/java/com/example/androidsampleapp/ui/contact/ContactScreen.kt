@@ -87,8 +87,6 @@ fun ContactScreen(
                 notices = state.notices,
                 onNoticeClick = onNoticeClick,
                 onClearClick = onClearNoticesClick,
-                isLoading = state.isLoadingNotices,
-                loadFailed = state.noticeLoadFailed,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = MaterialTheme.dimensions.spaceMedium),

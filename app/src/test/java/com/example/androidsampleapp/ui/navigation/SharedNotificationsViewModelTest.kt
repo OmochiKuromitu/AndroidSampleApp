@@ -20,7 +20,9 @@ import com.example.androidsampleapp.ui.sleep.SleepIntent
 import com.example.androidsampleapp.ui.sleep.SleepViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,9 +30,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -90,15 +92,51 @@ class SharedNotificationsViewModelTest {
         viewModel.refresh()
         advanceUntilIdle()
         assertEquals(0, fixture.contactRepository.missedCallCount.value)
-        assertTrue(fixture.noticeRepository.noticeSnapshot.value.isLoaded)
+        assertEquals(listOf("old"), fixture.noticeRepository.notices.value.map { it.id })
 
         fixture.contactApi.failOnGet = false
         fixture.noticeApi.failOnGet = true
         viewModel.refresh()
         advanceUntilIdle()
         assertEquals(5, fixture.contactRepository.missedCallCount.value)
-        assertTrue(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
-        assertEquals(listOf("old"), fixture.noticeRepository.noticeSnapshot.value.notices.map { it.id })
+        assertTrue(fixture.noticeRepository.notices.value.isEmpty())
+    }
+
+    @Test
+    fun `取得中に refresh したら前の要求を打ち切り、新しい要求の結果を出す`() = runTest {
+        // タブ移動が続いたときは、最後の切り替えで投げた要求を優先する。
+        val fixture = NotificationTestFixture()
+        val viewModel = navigationViewModel(fixture)
+        viewModel.refresh()
+        runCurrent()
+
+        fixture.contactApi.count = 7
+        fixture.noticeApi.notices = listOf(noticeResponse("new", 300))
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        // 打ち切った要求が Repository のロックを外してから投げ直すので、新しい方は間引かれない。
+        assertEquals(listOf("count", "count"), fixture.contactApi.calls)
+        assertEquals(listOf("list", "list"), fixture.noticeApi.calls)
+        assertEquals(7, fixture.contactRepository.missedCallCount.value)
+        assertEquals(listOf("new"), fixture.noticeRepository.notices.value.map { it.id })
+    }
+
+    @Test
+    fun `前の要求の結果が後から届いても新しい要求の結果を上書きしない`() = runTest {
+        val fixture = NotificationTestFixture()
+        val viewModel = navigationViewModel(fixture)
+        fixture.noticeApi.listResponse = {
+            withContext(NonCancellable) { delay(500); listOf(noticeResponse("old", 100)) }
+        }
+        viewModel.refresh()
+        runCurrent()
+
+        fixture.noticeApi.listResponse = { delay(100); listOf(noticeResponse("new", 300)) }
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(listOf("new"), fixture.noticeRepository.notices.value.map { it.id })
     }
 
     @Test
@@ -111,13 +149,12 @@ class SharedNotificationsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(0, fixture.manager.missedCallCount.value)
-        assertFalse(fixture.manager.noticeSnapshot.value.isLoaded)
-        assertFalse(fixture.manager.noticeSnapshot.value.loadFailed)
+        assertTrue(fixture.manager.notices.value.isEmpty())
 
         navigationViewModel(fixture).refresh()
         advanceUntilIdle()
         assertEquals(5, fixture.manager.missedCallCount.value)
-        assertTrue(fixture.manager.noticeSnapshot.value.isLoaded)
+        assertEquals(listOf("old"), fixture.manager.notices.value.map { it.id })
     }
 
     @Test
@@ -158,9 +195,8 @@ class SharedNotificationsViewModelTest {
         advanceTimeBy(150)
         runCurrent()
 
-        assertTrue(contact.uiState.value.noticeLoadFailed)
-        assertTrue(sleep.uiState.value.noticeLoadFailed)
-        assertEquals(listOf("old"), sleep.uiState.value.notices.map { it.id })
+        assertTrue(contact.uiState.value.notices.isEmpty())
+        assertTrue(sleep.uiState.value.notices.isEmpty())
         store.clear()
     }
 
@@ -183,8 +219,7 @@ class SharedNotificationsViewModelTest {
         runCurrent()
 
         assertTrue(cancelled)
-        assertFalse(fixture.noticeRepository.noticeSnapshot.value.loadFailed)
-        assertEquals(listOf("old"), fixture.noticeRepository.noticeSnapshot.value.notices.map { it.id })
+        assertEquals(listOf("old"), fixture.noticeRepository.notices.value.map { it.id })
         fixture.noticeRepository.refreshNotices()
         assertEquals(listOf("list", "delete", "list"), fixture.noticeApi.calls)
     }

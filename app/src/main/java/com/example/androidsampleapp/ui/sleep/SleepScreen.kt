@@ -90,8 +90,6 @@ fun SleepScreen(
                     notices = state.notices,
                     onNoticeClick = onNoticeClick,
                     onClearClick = onClearNoticesClick,
-                    isLoading = state.isLoadingNotices,
-                    loadFailed = state.noticeLoadFailed,
                     contentColor = Color.White,
                 )
             }
@@ -223,26 +221,6 @@ private fun SleepScreenEmptyPreview() {
     PreviewSurface {
         SleepScreen(
             state = SleepState(timeText = "21:47:05", dateText = "9月10日 (水)"),
-            onNoticeClick = {},
-            onClearNoticesClick = {},
-            onClearNoticesConfirm = {},
-            onClearNoticesDismiss = {},
-            onUnlockDrag = {},
-            onUnlockCancel = {},
-        )
-    }
-}
-
-@PanelPreview
-@Composable
-private fun SleepScreenLoadFailedPreview() {
-    PreviewSurface {
-        SleepScreen(
-            state = SleepState(
-                timeText = "21:47:05",
-                dateText = "9月10日 (水)",
-                noticeLoadFailed = true,
-            ),
             onNoticeClick = {},
             onClearNoticesClick = {},
             onClearNoticesConfirm = {},

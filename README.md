@@ -260,7 +260,7 @@ Activity に持たせて引数で降ろす手もあるが、遷移に必要な�
 ## HTTP で取るデータ — リポジトリの StateFlow
 
 電話帳・履歴（`ContactRepository.addressBook`）、不在着信の件数
-（`ContactRepository.missedCallCount`）、通知と取得状況（`NoticeRepository.noticeSnapshot`）は、
+（`ContactRepository.missedCallCount`）、通知の一覧（`NoticeRepository.notices`）は、
 Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通して受け取り、
 値が流れるたびに Intent にして Reducer に通す。
 
@@ -272,10 +272,12 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 - 電話帳・履歴は Repository 内に保持する。まだ一度も取れていなければ `null`。
 - 不在着信の件数と通知は `MissedCallManager` に保持し、Repository が読み書きする。
   Manager は状態の器だけで、UseCase の呼び出し、コルーチンの起動、Flow の購読は行わない。
-- 通知は `domain/model/NoticeSnapshot` の `isLoaded` と `loadFailed` で
-  未取得・取得済みの空一覧・取得失敗を区別する。通知の並び替えと取得状況の更新は Repository が行う。
-- 取得済みの値は画面を開き直したときにもすぐ届く。失敗しても前回の件数・一覧を残す。
-- 通常の重複取得は Repository で間引く。既読・消去は待って実行し、操作と再取得を直列化する。
+- 通知は一覧だけを持ち、読み込み中や失敗の印は持たない。未取得・取得失敗・取ったら空、は
+  どれも空の一覧として流れる。通知の並び替えと、失敗時に一覧を空にするのは Repository が行う。
+- 取得済みの値は画面を開き直したときにもすぐ届く。失敗したら件数は前回の値を残し、通知の一覧は空にする。
+- タブ移動などで取り直しが重なったら、`MissedCallViewModel` が実行中の要求を打ち切ってから投げ直し、
+  新しい要求の結果を出す。Repository 側でも実行中の通常取得には重ねない。
+  既読・消去は待って実行し、操作と再取得を直列化する。
   件数と通知の競合制御は別々なので、一方の操作で他方の取得を止めない。
 - 実行と購読は ViewModel の `viewModelScope` に従う。キャンセルは失敗として扱わず再送出する。
   Manager の寿命に紐づいた常駐処理は作らない。
@@ -493,7 +495,7 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 それ以外との間に線を引く。** フラグ付きの中はサーバから来た順のまま、それ以外は `occurredAt` の新しい順に並べる。
 分けて並べるのは表示の都合なので `ui/common/NoticeList` で行う。`pinned` が省かれた通知はフラグ無しとして読む。
 
-読み手が 2 画面あるので、一覧と取得状況は `core/MissedCallManager`（`@Singleton`）に保持する。
+読み手が 2 画面あるので、一覧は `core/MissedCallManager`（`@Singleton`）に保持する。
 取得のきっかけは `AppNavigation` が決め、`MissedCallViewModel` が
 `RefreshNoticesUseCase` を実行する。Manager は通信も購読も行わない。
 
@@ -505,7 +507,7 @@ Reducer に渡す。`SleepState.unlockProgress` がそれを保持し、ヒン�
 AppNavigation → MissedCallViewModel → RefreshNoticesUseCase → NoticeRepository
   └▶ POST /notices/list → ドメインの型へ変換・新しい順に並べ替え → MissedCallManager に保存
 
-MissedCallManager.noticeSnapshot → NoticeRepository.noticeSnapshot → ObserveNoticesUseCase
+MissedCallManager.notices → NoticeRepository.notices → ObserveNoticesUseCase
   ├▶ SleepViewModel   → NoticesChanged → Reducer → State
   └▶ ContactViewModel → NoticesChanged → Reducer → State
 ```
@@ -524,12 +526,22 @@ ClearNoticesConfirmed → ViewModel → ClearNoticesUseCase → NoticeRepository
 ```
 
 消去後に取り直すのは、消している間に届いた通知を落とさないため。
-取得も消去も `noticeSnapshot` に戻り、失敗も同じ経路で各画面へ届く。
-読み込み中は `NoticeSnapshot.isLoading`（未取得かつ失敗していない間）で決める。
+取得も消去も `notices` に戻り、失敗も空の一覧として同じ経路で各画面へ届く。
 
-通常の取得は実行中なら間引く。消去は実行中の取得が終わるのを待ち、
+読み込み中と失敗は画面で出し分けない。まだ取れていない間も、取得や消去に失敗したときも
+「通知はありません」と出る。失敗しても古い一覧を出し続けると、取れていないことに気づけないため、
+失敗したら Repository が一覧を空にする。キャンセルは失敗として扱わず、一覧に触らない。
+次の画面切り替えで再試行する。
+
+タブ移動が続いたときは、最後の切り替えで投げた要求を優先する。`MissedCallViewModel.refresh()` は
+種類（件数 / 通知）ごとに実行中の Job を持ち、それを `cancelAndJoin()` してから投げ直す。
+打ち切った要求の結果は捨てられるので、遅れて届いても新しい結果を上書きしない。
+Join を待つのは、前の要求が Repository のロックを外す前に投げると、実行中とみなされて間引かれるため。
+打ち切りの判断は `MissedCallViewModel` が持ち、Repository と Manager は打ち切りを知らない。
+
+Repository は通常の取得を実行中なら間引く。消去は実行中の取得が終わるのを待ち、
 消去と再取得の間に別の要求を割り込ませない。古い取得結果が消去後の一覧を上書きするのを防ぐ。
-失敗時は前回の一覧を残して失敗を記録し、次の画面切り替えで再試行する。
+消去の実行中に来た通常の取得は間引かれる（消去のあとに取り直すため）。
 
 消去は操作した画面の `viewModelScope` で動き、ViewModel が破棄されると中断する。
 サーバ側で消去済みでも再取得前に中断した場合は、次の共通取得で状態を同期する。
@@ -603,7 +615,8 @@ ContactViewModel（履歴を見せた）→ MarkMissedCallsAsReadUseCase → Con
 2 か所。まだ件数が届いていない場合もあるので、現在の件数による間引きはしない。
 既読後の再取得は Repository が行い、既読中に届いた分も反映する。Reducer は件数を先読みしない。
 
-通常の取得は同じ種類の要求が実行中なら間引く。既読は待って実行し、既読と再取得を直列化する。
+タブ移動で取り直しが重なったら、通知と同じく `MissedCallViewModel` が前の要求を打ち切って投げ直す。
+Repository 側では同じ種類の要求が実行中なら間引く。既読は待って実行し、既読と再取得を直列化する。
 通信失敗では前回の件数を残す。通知用とは別のロックなので、通知の消去や取得に影響しない。
 
 取得・既読は呼び出し元の ViewModel の寿命で動く。既読後の再取得前に中断した場合は、
