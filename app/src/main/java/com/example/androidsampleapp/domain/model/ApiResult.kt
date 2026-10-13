@@ -16,7 +16,10 @@ sealed interface ApiResult<out T> {
     /** HTTP 200 だが、本文の resultCode が成功（0）以外だった。 */
     data class BusinessError(val resultCode: Int) : ApiResult<Nothing>
 
-    /** 接続・読み込み・呼び出し全体のどれかがタイムアウトした。 */
+    /**
+     * 接続・読み込み・書き込み・呼び出し全体のどれかがタイムアウトした。
+     * サーバが 408 Request Timeout / 504 Gateway Timeout を返したときもこれにする。
+     */
     data object Timeout : ApiResult<Nothing>
 
     /** HTTP 4xx。サーバがエラー本文を返していれば [error] に入る。 */

@@ -44,6 +44,8 @@ fun Throwable.toApiResult(): ApiResult<Nothing> = when (this) {
     // どちらも IOException の仲間でもあるので、IOException より先に判定する。
     is InterruptedIOException -> ApiResult.Timeout
     is HttpException -> when (code()) {
+        // サーバ側の時間切れ（408 Request Timeout / 504 Gateway Timeout）も、画面では同じタイムアウトとして扱う。
+        408, 504 -> ApiResult.Timeout
         in 400..499 -> ApiResult.ClientError(code(), apiError())
         in 500..599 -> ApiResult.ServerError(code(), apiError())
         else -> ApiResult.Unknown(this)

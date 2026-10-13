@@ -294,7 +294,7 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 | --- | --- |
 | `Success(data)` | HTTP 200 で、本文の `resultCode` が 0（または結果コードを持たない API） |
 | `BusinessError(resultCode)` | HTTP 200 だが、本文の `resultCode` が 0 以外 |
-| `Timeout` | 接続・読み込み・呼び出し全体のどれかがタイムアウト |
+| `Timeout` | 接続・読み込み・書き込み・呼び出し全体のどれかがタイムアウト。サーバが 408 / 504 を返したときも含む |
 | `ClientError(httpCode, error)` | HTTP 4xx。サーバがエラー本文を返していれば `error` に `code` と `message` が入る |
 | `ServerError(httpCode, error)` | HTTP 5xx。同上 |
 | `NetworkError` | 圏外・接続拒否・切断など、タイムアウト以外の通信エラー |
@@ -354,6 +354,9 @@ is XxxEffect.ShowError ->
 - タイムアウトは `InterruptedIOException` で判定する。接続・読み込みのタイムアウト（`SocketTimeoutException`）も
   OkHttp の `callTimeout`（`InterruptedIOException("timeout")`）もこれの仲間で、どちらも `IOException` の仲間でもある。
   秒数は `di/NetworkModule` の `OkHttpClient` で決める。
+- サーバ側の時間切れ（408 Request Timeout / 504 Gateway Timeout）も `Timeout` にする。
+  応答は届いているので HTTP エラーではあるが、利用者から見れば「待ったが返ってこなかった」で同じため。
+  エラー本文があっても `Timeout` には持たせない（既定のタイムアウトの文言を出す）。
 
 ## ディレクトリ
 

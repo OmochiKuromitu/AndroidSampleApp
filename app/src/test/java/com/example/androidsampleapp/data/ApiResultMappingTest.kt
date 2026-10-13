@@ -147,6 +147,15 @@ class ApiResultMappingTest {
     }
 
     @Test
+    fun `408 と 504 は HTTP エラーではなく Timeout`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(408))
+        assertEquals(ApiResult.Timeout, call())
+
+        server.enqueue(MockResponse().setResponseCode(504).setBody("""{"code":"UPSTREAM","message":"応答がありません"}"""))
+        assertEquals(ApiResult.Timeout, call())
+    }
+
+    @Test
     fun `OkHttp の callTimeout も Timeout`() {
         // callTimeout は SocketTimeoutException ではなく InterruptedIOException("timeout") で来る。
         assertEquals(ApiResult.Timeout, InterruptedIOException("timeout").toApiResult())
