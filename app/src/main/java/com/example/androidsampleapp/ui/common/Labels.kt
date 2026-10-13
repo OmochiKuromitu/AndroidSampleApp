@@ -3,6 +3,7 @@ package com.example.androidsampleapp.ui.common
 import androidx.annotation.StringRes
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.domain.model.AirconMode
+import com.example.androidsampleapp.domain.model.ApiResult
 import com.example.androidsampleapp.domain.model.NoticeCategory
 
 // ドメインの値を画面に出すときの表示名。
@@ -25,4 +26,21 @@ fun NoticeCategory.labelRes(): Int = when (this) {
     NoticeCategory.AIRCON -> R.string.notice_category_aircon
     NoticeCategory.ALERT -> R.string.notice_category_alert
     NoticeCategory.INFO -> R.string.notice_category_info
+}
+
+/**
+ * API の失敗を画面に出すときの既定の文言。成功なら null。
+ *
+ * サーバがエラー本文で message を返していれば、そちらを優先して出す（`ApiResult.apiError`）。
+ * この文言は、message が無いときと、サーバに届かなかったとき（タイムアウトなど）に使う。
+ */
+@StringRes
+fun ApiResult<*>.errorMessageRes(): Int? = when (this) {
+    is ApiResult.Success -> null
+    is ApiResult.BusinessError -> R.string.api_error_business
+    ApiResult.Timeout -> R.string.api_error_timeout
+    is ApiResult.ClientError -> R.string.api_error_client
+    is ApiResult.ServerError -> R.string.api_error_server
+    ApiResult.NetworkError -> R.string.api_error_network
+    is ApiResult.Unknown -> R.string.api_error_unknown
 }

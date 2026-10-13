@@ -53,4 +53,12 @@
     <string name="notice_category_alert">警報</string>
     <string name="notice_category_info">お知らせ</string>
 
+    <!-- API の失敗。サーバが message を返したときはそちらを出す -->
+    <string name="api_error_business">処理できませんでした</string>
+    <string name="api_error_timeout">通信がタイムアウトしました。時間をおいてもう一度お試しください</string>
+    <string name="api_error_client">要求を受け付けられませんでした</string>
+    <string name="api_error_server">サーバでエラーが発生しました。時間をおいてもう一度お試しください</string>
+    <string name="api_error_network">通信できませんでした。接続を確認してください</string>
+    <string name="api_error_unknown">予期しないエラーが発生しました</string>
+
 </resources>

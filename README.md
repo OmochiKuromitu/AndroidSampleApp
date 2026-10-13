@@ -295,8 +295,8 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 | `Success(data)` | HTTP 200 で、本文の `resultCode` が 0（または結果コードを持たない API） |
 | `BusinessError(resultCode)` | HTTP 200 だが、本文の `resultCode` が 0 以外 |
 | `Timeout` | 接続・読み込み・呼び出し全体のどれかがタイムアウト |
-| `ClientError(httpCode)` | HTTP 4xx |
-| `ServerError(httpCode)` | HTTP 5xx |
+| `ClientError(httpCode, error)` | HTTP 4xx。サーバがエラー本文を返していれば `error` に `code` と `message` が入る |
+| `ServerError(httpCode, error)` | HTTP 5xx。同上 |
 | `NetworkError` | 圏外・接続拒否・切断など、タイムアウト以外の通信エラー |
 | `Unknown(cause)` | JSON が読めないなど、上のどれでもない失敗 |
 
@@ -315,26 +315,40 @@ override suspend fun getXxxList(): ApiResult<List<Xxx>> =
         onFailure = { it.toApiResult() },
     )
 
-// ui/ — when で出し分ける。else を書かず、種類を足したときに書き忘れをコンパイルエラーで見つける
+// ui/ — 成功なら Intent で State に入れる。失敗は Effect で文言を出す
 viewModelScope.launch {
     when (val result = getXxxList()) {
         is ApiResult.Success -> onIntent(XxxIntent.Loaded(result.data))
-        is ApiResult.BusinessError -> onIntent(XxxIntent.BusinessFailed(result.resultCode))
-        ApiResult.Timeout -> onIntent(XxxIntent.TimedOut)
-        is ApiResult.ClientError,
-        is ApiResult.ServerError,
-        ApiResult.NetworkError,
-        is ApiResult.Unknown,
-        -> onIntent(XxxIntent.LoadFailed)
+        else -> {
+            onIntent(XxxIntent.LoadFailed)
+            // サーバの message があればそれを、無ければ失敗の種類ごとの既定の文言を出す
+            val fallbackRes = result.errorMessageRes() ?: R.string.api_error_unknown
+            _effect.send(XxxEffect.ShowError(result.apiError?.message, fallbackRes))
+        }
     }
 }
+
+// XxxEffect
+data class ShowError(val message: String?, @StringRes val fallbackRes: Int) : XxxEffect
+
+// XxxRoute
+is XxxEffect.ShowError ->
+    snackbarHostState.showSnackbar(effect.message ?: context.getString(effect.fallbackRes))
 ```
+
+失敗の種類で処理そのものを変えたい（タイムアウトなら再試行ボタンを出す、など）ときは、
+`else` にまとめずに種類ごとに書く。`else` を書かなければ、`ApiResult` に種類を足したときに
+書き忘れている箇所がコンパイルエラーで見つかる。
 
 - 結果コードを持たない API は、`onSuccess = { ApiResult.Success(it.toDomain()) }` と書く。
   中身の無い API は `ApiResult<Unit>` にして `ApiResult.Success(Unit)` を返す。
 - `Success` に入れるのはドメインの型。`ApiResult` は domain に置いているので、
   ここに `model/` の型を入れると ViewModel が通信の型を知ることになる。
 - `onSuccess { }` / `onFailure { }`（`fold` ではない方）は戻り値の型を変えられないので、`fold` を使う。
+- 4xx / 5xx のエラー本文は `model/ApiErrorResponse`（`{"code":"...","message":"..."}`）として読み、
+  `domain/model/ApiError` にして持たせる。本文が空や HTML のエラーページなど、想定した JSON でなければ `error` は null。
+  形はサンプル用の仮の仕様なので、使うサーバに合わせて `ApiErrorResponse` を直す。
+- 既定の文言は `ui/common/Labels` の `errorMessageRes()` が持つ。表示名と同じく、文言は ui 層で決める。
 - キャンセルは結果にせず投げ直す（`data/ApiResultMapping` の `Throwable.toApiResult()` が行う）。
   `runCatching` はキャンセルも捕まえるので、結果に変えると閉じた画面に失敗の表示が流れる。
 - タイムアウトは `InterruptedIOException` で判定する。接続・読み込みのタイムアウト（`SocketTimeoutException`）も

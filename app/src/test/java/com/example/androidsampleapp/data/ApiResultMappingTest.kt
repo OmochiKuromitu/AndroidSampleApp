@@ -1,7 +1,9 @@
 package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.di.NetworkModule
+import com.example.androidsampleapp.domain.model.ApiError
 import com.example.androidsampleapp.domain.model.ApiResult
+import com.example.androidsampleapp.domain.model.apiError
 import com.example.androidsampleapp.model.ResultCodeResponse
 import java.io.InterruptedIOException
 import java.util.concurrent.TimeUnit
@@ -90,6 +92,37 @@ class ApiResultMappingTest {
         server.enqueue(MockResponse().setResponseCode(503))
 
         assertEquals(ApiResult.ServerError(503), call())
+    }
+
+    @Test
+    fun `4xx でエラー本文があれば code と message を持たせる`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(400)
+                .setBody("""{"code":"INVALID_DEVICE","message":"端末が不正です","extra":1}"""),
+        )
+
+        val result = call()
+
+        assertEquals(ApiResult.ClientError(400, ApiError("INVALID_DEVICE", "端末が不正です")), result)
+        assertEquals("端末が不正です", result.apiError?.message)
+    }
+
+    @Test
+    fun `5xx でエラー本文があれば code と message を持たせる`() = runTest {
+        server.enqueue(
+            MockResponse().setResponseCode(500)
+                .setBody("""{"code":"MAINTENANCE","message":"メンテナンス中です"}"""),
+        )
+
+        assertEquals(ApiResult.ServerError(500, ApiError("MAINTENANCE", "メンテナンス中です")), call())
+    }
+
+    @Test
+    fun `エラー本文が想定した JSON でなければ error は null`() = runTest {
+        // プロキシや Web サーバが返す HTML のエラーページなど。
+        server.enqueue(MockResponse().setResponseCode(502).setBody("<html>Bad Gateway</html>"))
+
+        assertEquals(ApiResult.ServerError(502, null), call())
     }
 
     @Test

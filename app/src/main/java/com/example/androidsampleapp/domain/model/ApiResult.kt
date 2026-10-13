@@ -19,11 +19,11 @@ sealed interface ApiResult<out T> {
     /** 接続・読み込み・呼び出し全体のどれかがタイムアウトした。 */
     data object Timeout : ApiResult<Nothing>
 
-    /** HTTP 4xx。 */
-    data class ClientError(val httpCode: Int) : ApiResult<Nothing>
+    /** HTTP 4xx。サーバがエラー本文を返していれば [error] に入る。 */
+    data class ClientError(val httpCode: Int, val error: ApiError? = null) : ApiResult<Nothing>
 
-    /** HTTP 5xx。 */
-    data class ServerError(val httpCode: Int) : ApiResult<Nothing>
+    /** HTTP 5xx。サーバがエラー本文を返していれば [error] に入る。 */
+    data class ServerError(val httpCode: Int, val error: ApiError? = null) : ApiResult<Nothing>
 
     /** 圏外・接続拒否・切断など、タイムアウト以外の通信エラー。 */
     data object NetworkError : ApiResult<Nothing>
@@ -31,3 +31,20 @@ sealed interface ApiResult<out T> {
     /** JSON が読めないなど、上のどれでもない失敗。 */
     data class Unknown(val cause: Throwable) : ApiResult<Nothing>
 }
+
+/**
+ * 4xx / 5xx のときにサーバが本文で返したエラーの内容。
+ * 本文が空、または想定した JSON でなければ作らない（[ApiResult.ClientError.error] などが null になる）。
+ */
+data class ApiError(
+    val code: String,
+    val message: String,
+)
+
+/** サーバがエラー本文を返していればその内容。それ以外の結果では null。 */
+val ApiResult<*>.apiError: ApiError?
+    get() = when (this) {
+        is ApiResult.ClientError -> error
+        is ApiResult.ServerError -> error
+        else -> null
+    }
