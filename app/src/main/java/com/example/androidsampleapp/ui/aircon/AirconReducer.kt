@@ -10,9 +10,10 @@ import com.example.androidsampleapp.core.mvi.Reducer
 class AirconReducer : Reducer<AirconState, AirconIntent> {
     override fun reduce(state: AirconState, intent: AirconIntent): AirconState = when (intent) {
         is AirconIntent.AirconChanged -> state.copy(aircon = intent.aircon)
+        is AirconIntent.SettingsChanged -> state.copy(settings = intent.settings)
         is AirconIntent.ConnectionStateChanged -> state.copy(connectionState = intent.state)
 
-        // 操作後の値は AirconChanged で反映されるので、ここでは送信中にするだけ。
+        // 操作後の値は AirconChanged / SettingsChanged で反映されるので、ここでは送信中にするだけ。
         is AirconIntent.PowerToggled,
         AirconIntent.TemperatureUpClicked,
         AirconIntent.TemperatureDownClicked,

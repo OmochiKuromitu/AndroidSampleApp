@@ -3,6 +3,7 @@ package com.example.androidsampleapp.ui.aircon
 import com.example.androidsampleapp.core.mvi.UiIntent
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
+import com.example.androidsampleapp.domain.model.AirconSettings
 import com.example.androidsampleapp.domain.model.ConnectionState
 
 /**
@@ -16,6 +17,9 @@ sealed interface AirconIntent : UiIntent {
 
     /** エアコンの現在値が変わった。 */
     data class AirconChanged(val aircon: Aircon) : AirconIntent
+
+    /** Repository が保持する、最後に設定に成功した温度・モードの変化。 */
+    data class SettingsChanged(val settings: AirconSettings) : AirconIntent
 
     /** 機器との接続状態が変わった。未接続の間は操作を止める。 */
     data class ConnectionStateChanged(val state: ConnectionState) : AirconIntent
@@ -38,7 +42,7 @@ sealed interface AirconIntent : UiIntent {
 
     /**
      * コマンドの API が成功した。
-     * 実際の値は、API の応答で更新された状態が [AirconChanged] として流れて反映される。
+     * 機器の現在値は [AirconChanged]、保存した設定値は [SettingsChanged] で反映される。
      */
     data object CommandSucceeded : AirconIntent
 
