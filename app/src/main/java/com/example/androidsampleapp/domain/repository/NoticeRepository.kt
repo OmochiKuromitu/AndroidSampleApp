@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
  * 取った結果を [notices] に公開する。画面をまたいで同じ一覧を購読する。
  */
 interface NoticeRepository {
-    /** 通知の一覧（新しいものが先頭）。まだ取れていないとき、直近の取得や消去が失敗したときは空。 */
+    /** 通知の一覧（新しいものが先頭）。まだ取れていないとき、直近の取得が失敗したときは空。 */
     val notices: StateFlow<List<Notice>>
 
     /**
@@ -20,7 +20,9 @@ interface NoticeRepository {
 
     /**
      * 消去して一覧を取り直す。取得中でも消去操作は取り落とさない。
-     * 消去と再取得の間に別の要求を割り込ませず、失敗したら一覧を空にして例外を投げる。
+     * 消去と再取得の間に別の要求を割り込ませない。
+     * 消去 API が失敗したら一覧を残して例外を投げる（取り直さない）。
+     * 消去のあとの取り直しが失敗したら、通常の取得と同じく一覧を空にして例外を投げる。
      */
     suspend fun deleteAllNotices()
 }

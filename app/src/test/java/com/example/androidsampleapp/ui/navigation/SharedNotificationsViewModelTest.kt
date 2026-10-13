@@ -185,7 +185,7 @@ class SharedNotificationsViewModelTest {
     }
 
     @Test
-    fun `スリープ画面の消去失敗も両画面の状態に反映する`() = runTest {
+    fun `スリープ画面の消去に失敗しても両画面とも一覧を残す`() = runTest {
         val fixture = NotificationTestFixture()
         val contact = contactViewModel(fixture)
         val sleep = sleepViewModel(fixture)
@@ -195,8 +195,8 @@ class SharedNotificationsViewModelTest {
         advanceTimeBy(150)
         runCurrent()
 
-        assertTrue(contact.uiState.value.notices.isEmpty())
-        assertTrue(sleep.uiState.value.notices.isEmpty())
+        assertEquals(listOf("old"), contact.uiState.value.notices.map { it.id })
+        assertEquals(listOf("old"), sleep.uiState.value.notices.map { it.id })
         store.clear()
     }
 

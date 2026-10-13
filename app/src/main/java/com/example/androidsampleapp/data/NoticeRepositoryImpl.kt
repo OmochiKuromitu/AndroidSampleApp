@@ -20,8 +20,9 @@ import kotlinx.coroutines.sync.withLock
  * AppStateHolder は通らない。
  *
  * 結果は MissedCallManager に反映し、[notices] として公開する。
- * 一覧の並び替え、失敗時に一覧を空にすること、取得と消去の競合制御もここで行う。
- * 失敗しても古い一覧を出し続けると、取れていないことに画面から気づけないため空にする。
+ * 一覧の並び替え、取得失敗時に一覧を空にすること、取得と消去の競合制御もここで行う。
+ * 取得に失敗しても古い一覧を出し続けると、取れていないことに画面から気づけないため空にする。
+ * 消去 API の失敗では一覧を残す。サーバ側の一覧は消えていないので、出していた一覧が正しいまま。
  * コルーチンは作らず、呼び出し元の寿命で実行する。
  *
  * API はどの端末からの要求かを本文で名乗らせる。端末の ID は [AppConfig.deviceId] から詰める。
@@ -51,14 +52,15 @@ class NoticeRepositoryImpl @Inject constructor(
 
     override suspend fun deleteAllNotices() {
         noticeMutex.withLock {
+            // 消去に失敗したら例外だけ上げ、一覧はそのまま残す（取り直しもしない）。
+            api.deleteAllNotices(request())
             // 消去中に届いた通知も反映する。消去と再取得の間に別の要求を入れない。
-            requestNotices { api.deleteAllNotices(request()) }
+            requestNotices()
         }
     }
 
-    private suspend fun requestNotices(beforeFetch: suspend () -> Unit = {}) {
+    private suspend fun requestNotices() {
         try {
-            beforeFetch()
             val fetched = api.getNotices(request())
                 .map { it.toDomain() }
                 .sortedByDescending { it.occurredAt }

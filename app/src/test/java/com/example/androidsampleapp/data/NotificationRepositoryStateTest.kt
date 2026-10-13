@@ -151,7 +151,7 @@ class NotificationRepositoryStateTest {
     }
 
     @Test
-    fun `消去に失敗したら一覧を空にし、取り直さない`() = runTest {
+    fun `消去に失敗したら一覧を残し、取り直さない`() = runTest {
         val fixture = NotificationTestFixture()
         val repository = fixture.noticeRepository
         repository.refreshNotices()
@@ -159,6 +159,18 @@ class NotificationRepositoryStateTest {
         assertTrue(runCatching { repository.deleteAllNotices() }.exceptionOrNull() is IOException)
 
         assertEquals(listOf("list", "delete"), fixture.noticeApi.calls)
+        assertEquals(listOf("old"), repository.notices.value.map { it.id })
+    }
+
+    @Test
+    fun `消去のあとの取り直しに失敗したら一覧を空にする`() = runTest {
+        val fixture = NotificationTestFixture()
+        val repository = fixture.noticeRepository
+        repository.refreshNotices()
+        fixture.noticeApi.failOnGet = true
+        assertTrue(runCatching { repository.deleteAllNotices() }.exceptionOrNull() is IOException)
+
+        assertEquals(listOf("list", "delete", "list"), fixture.noticeApi.calls)
         assertTrue(repository.notices.value.isEmpty())
     }
 

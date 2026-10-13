@@ -111,7 +111,7 @@ class SleepViewModel @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // 失敗したら Repository が一覧を空にし、NoticesChanged で受け取る。
+            // 消去 API の失敗では一覧が残る。取り直しの失敗では空の一覧が NoticesChanged で届く。
         }
     }
 
