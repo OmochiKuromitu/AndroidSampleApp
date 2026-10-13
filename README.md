@@ -290,6 +290,19 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 共有状態に入れず、呼んだ画面が結果を受け取れば済む API は、Repository が `domain/model/ApiResult` を返す。
 例外を投げずに戻り値で失敗を返すので、ViewModel に `try` / `catch` は要らず、`when` で出し分けるだけになる。
 
+今使っているのは、利用者の操作を送る API。結果はその画面のスナックバーで出す。
+
+| API | Repository | 呼ぶ ViewModel |
+| --- | --- | --- |
+| エアコンの電源・モード・温度 | `AirconRepository.setPower` / `setMode` / `setTargetTemperature` | `AirconViewModel` |
+| 着信の応答・拒否 | `DeviceRepository.answerCall` / `rejectCall` | `TopViewModel` |
+
+失敗したときは、サーバの message があればそれを、無ければ `errorMessageRes()` の文言を
+`ShowMessage(messageRes, text)` で出す（`text` が優先）。
+
+定期取得（状態取得、通知、不在着信の件数、電話帳）は今までどおり、結果を共有状態に入れて
+`StateFlow` で流す形のままにしている。呼んだ画面に結果を返すのではなく、購読している全画面に届けるため。
+
 | 結果 | 起きたこと |
 | --- | --- |
 | `Success(data)` | HTTP 200 で、本文の `resultCode` が 0（または結果コードを持たない API） |
@@ -322,18 +335,22 @@ viewModelScope.launch {
         else -> {
             onIntent(XxxIntent.LoadFailed)
             // サーバの message があればそれを、無ければ失敗の種類ごとの既定の文言を出す
-            val fallbackRes = result.errorMessageRes() ?: R.string.api_error_unknown
-            _effect.send(XxxEffect.ShowError(result.apiError?.message, fallbackRes))
+            _effect.send(
+                XxxEffect.ShowMessage(
+                    messageRes = result.errorMessageRes() ?: R.string.command_failed,
+                    text = result.apiError?.message,
+                ),
+            )
         }
     }
 }
 
 // XxxEffect
-data class ShowError(val message: String?, @StringRes val fallbackRes: Int) : XxxEffect
+data class ShowMessage(@StringRes val messageRes: Int, val text: String? = null) : XxxEffect
 
 // XxxRoute
-is XxxEffect.ShowError ->
-    snackbarHostState.showSnackbar(effect.message ?: context.getString(effect.fallbackRes))
+is XxxEffect.ShowMessage ->
+    snackbarHostState.showSnackbar(effect.text ?: context.getString(effect.messageRes))
 ```
 
 失敗の種類で処理そのものを変えたい（タイムアウトなら再試行ボタンを出す、など）ときは、

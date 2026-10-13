@@ -3,6 +3,7 @@ package com.example.androidsampleapp.data
 import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.core.AppStateHolder
 import com.example.androidsampleapp.domain.model.AirconMode
+import com.example.androidsampleapp.domain.model.ApiResult
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
 import com.example.androidsampleapp.model.AirconModeRequest
@@ -42,6 +43,7 @@ class DeviceRepositoryImplTest {
         var statusCount = 0
             private set
         val answered = mutableListOf<CallRequest>()
+        var failAnswer = false
 
         override suspend fun getStatus(body: DeviceRequest): DeviceStatusResponse {
             statusCount++
@@ -54,6 +56,7 @@ class DeviceRepositoryImplTest {
 
         override suspend fun answerCall(body: CallRequest) {
             answered += body
+            if (failAnswer) throw IOException("answer failed")
         }
 
         override suspend fun rejectCall(body: CallRequest) = Unit
@@ -115,10 +118,22 @@ class DeviceRepositoryImplTest {
         holder.updateIncomingCall(IncomingCall(roomId = "101", displayName = "玄関"))
         val repository = DeviceRepositoryImpl(api, holder, config)
 
-        repository.answerCall("101")
+        assertEquals(ApiResult.Success(Unit), repository.answerCall("101"))
 
         assertEquals(listOf(CallRequest(deviceId = DEVICE_ID, roomId = "101")), api.answered)
         assertNull(holder.incomingCall.value)
+    }
+
+    @Test
+    fun `応答に失敗したら結果で返し、着信を残す`() = runTest {
+        val api = FakeDeviceApi().apply { failAnswer = true }
+        val holder = AppStateHolder()
+        val call = IncomingCall(roomId = "101", displayName = "玄関")
+        holder.updateIncomingCall(call)
+        val repository = DeviceRepositoryImpl(api, holder, config)
+
+        assertEquals(ApiResult.NetworkError, repository.answerCall("101"))
+        assertEquals(call, holder.incomingCall.value)
     }
 
     private companion object {

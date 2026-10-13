@@ -29,6 +29,8 @@ internal class FakeAirconDeviceApi : DeviceApi {
     val powers = mutableListOf<AirconPowerRequest>()
     var acceptedTemperature: Double? = null
     var failCommands = false
+    /** [failCommands] のときに投げる例外。既定は通信エラー。 */
+    var commandError: () -> Exception = { IOException("command failed") }
     var beforeResponse: suspend () -> Unit = {}
 
     override suspend fun getStatus(body: DeviceRequest) = DeviceStatusResponse(status)
@@ -56,7 +58,7 @@ internal class FakeAirconDeviceApi : DeviceApi {
 
     private suspend fun checkCommand() {
         beforeResponse()
-        if (failCommands) throw IOException("command failed")
+        if (failCommands) throw commandError()
     }
 
     override suspend fun answerCall(body: CallRequest) = Unit

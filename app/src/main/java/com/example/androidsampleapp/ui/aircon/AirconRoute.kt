@@ -30,7 +30,7 @@ fun AirconRoute(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is AirconEffect.ShowMessage ->
-                    snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+                    snackbarHostState.showSnackbar(effect.text ?: context.getString(effect.messageRes))
             }
         }
     }

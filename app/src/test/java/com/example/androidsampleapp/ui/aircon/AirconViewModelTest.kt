@@ -21,12 +21,16 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AirconViewModelTest {
@@ -119,7 +123,30 @@ class AirconViewModelTest {
         runCurrent()
         assertEquals(AirconSettings(mode = AirconMode.DRY), viewModel.uiState.value.settings)
         assertFalse(viewModel.uiState.value.isSendingCommand)
-        assertEquals(AirconEffect.ShowMessage(R.string.command_failed), viewModel.effect.first())
+        assertEquals(AirconEffect.ShowMessage(R.string.api_error_network), viewModel.effect.first())
+    }
+
+    @Test
+    fun `サーバがエラー本文で message を返したらそれを出す`() = runTest {
+        val fixture = AirconTestFixture()
+        val viewModel = viewModel(fixture)
+        fixture.api.failCommands = true
+        fixture.api.commandError = {
+            HttpException(
+                Response.error<Any>(
+                    503,
+                    """{"code":"MAINTENANCE","message":"メンテナンス中です"}""".toResponseBody("application/json".toMediaType()),
+                ),
+            )
+        }
+
+        viewModel.onIntent(AirconIntent.PowerToggled(false))
+        runCurrent()
+
+        assertEquals(
+            AirconEffect.ShowMessage(R.string.api_error_server, text = "メンテナンス中です"),
+            viewModel.effect.first(),
+        )
     }
 
     @Test

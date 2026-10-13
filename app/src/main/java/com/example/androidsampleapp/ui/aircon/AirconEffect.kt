@@ -9,7 +9,8 @@ import com.example.androidsampleapp.core.mvi.UiEffect
 sealed interface AirconEffect : UiEffect {
     /**
      * スナックバーで知らせる（今はコマンドの送信失敗だけ）。
+     * [text] があればそれを出す（サーバがエラー本文で返した message）。無ければ [messageRes] を出す。
      * 文言は画面側で解決する。ViewModel が Context を持たずに済む。
      */
-    data class ShowMessage(@StringRes val messageRes: Int) : AirconEffect
+    data class ShowMessage(@StringRes val messageRes: Int, val text: String? = null) : AirconEffect
 }

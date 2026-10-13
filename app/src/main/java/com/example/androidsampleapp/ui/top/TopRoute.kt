@@ -31,7 +31,7 @@ fun TopRoute(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is TopEffect.ShowMessage ->
-                    snackbarHostState.showSnackbar(context.getString(effect.messageRes))
+                    snackbarHostState.showSnackbar(effect.text ?: context.getString(effect.messageRes))
             }
         }
     }

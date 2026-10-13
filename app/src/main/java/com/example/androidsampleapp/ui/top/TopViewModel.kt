@@ -3,10 +3,13 @@ package com.example.androidsampleapp.ui.top
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.R
+import com.example.androidsampleapp.domain.model.ApiResult
+import com.example.androidsampleapp.domain.model.apiError
 import com.example.androidsampleapp.domain.usecase.AnswerCallUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveAirconStateUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveIncomingCallUseCase
 import com.example.androidsampleapp.domain.usecase.RejectCallUseCase
+import com.example.androidsampleapp.ui.common.errorMessageRes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -88,20 +91,27 @@ class TopViewModel @Inject constructor(
     private suspend fun respondToCall(
         roomId: String?,
         successMessage: Int,
-        send: suspend (String) -> Unit,
+        send: suspend (String) -> ApiResult<Unit>,
     ) {
         if (roomId == null) {
             onIntent(TopIntent.CommandFailed)
             return
         }
-        runCatching { send(roomId) }
-            .onSuccess {
+        when (val result = send(roomId)) {
+            is ApiResult.Success -> {
                 onIntent(TopIntent.CommandSucceeded)
                 _effect.send(TopEffect.ShowMessage(successMessage))
             }
-            .onFailure {
+            else -> {
                 onIntent(TopIntent.CommandFailed)
-                _effect.send(TopEffect.ShowMessage(R.string.command_failed))
+                // サーバの message があればそれを、無ければ失敗の種類ごとの文言を出す。
+                _effect.send(
+                    TopEffect.ShowMessage(
+                        messageRes = result.errorMessageRes() ?: R.string.command_failed,
+                        text = result.apiError?.message,
+                    ),
+                )
             }
+        }
     }
 }

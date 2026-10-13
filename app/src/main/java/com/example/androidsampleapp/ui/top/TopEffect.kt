@@ -9,7 +9,8 @@ import com.example.androidsampleapp.core.mvi.UiEffect
 sealed interface TopEffect : UiEffect {
     /**
      * スナックバーで知らせる（応答した、拒否した、送れなかった）。
+     * [text] があればそれを出す（サーバがエラー本文で返した message）。無ければ [messageRes] を出す。
      * 文言は画面側で解決する。ViewModel が Context を持たずに済む。
      */
-    data class ShowMessage(@StringRes val messageRes: Int) : TopEffect
+    data class ShowMessage(@StringRes val messageRes: Int, val text: String? = null) : TopEffect
 }

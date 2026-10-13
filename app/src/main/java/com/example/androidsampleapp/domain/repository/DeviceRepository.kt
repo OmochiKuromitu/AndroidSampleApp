@@ -1,5 +1,6 @@
 package com.example.androidsampleapp.domain.repository
 
+import com.example.androidsampleapp.domain.model.ApiResult
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ interface DeviceRepository {
      */
     suspend fun monitor()
 
-    suspend fun answerCall(roomId: String)
-    suspend fun rejectCall(roomId: String)
+    /** 応答 / 拒否 API。成功したら着信を消して [ApiResult.Success] を返す。失敗では着信を残す。 */
+    suspend fun answerCall(roomId: String): ApiResult<Unit>
+    suspend fun rejectCall(roomId: String): ApiResult<Unit>
 }

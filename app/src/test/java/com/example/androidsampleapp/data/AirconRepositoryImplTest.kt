@@ -2,7 +2,7 @@ package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.AirconSettings
-import java.io.IOException
+import com.example.androidsampleapp.domain.model.ApiResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -74,10 +74,20 @@ class AirconRepositoryImplTest {
         val previousAircon = fixture.repository.aircon.value
         fixture.api.failCommands = true
 
-        assertTrue(runCatching { fixture.repository.setTargetTemperature(28.0) }.exceptionOrNull() is IOException)
-        assertTrue(runCatching { fixture.repository.setMode(AirconMode.HEAT) }.exceptionOrNull() is IOException)
+        assertEquals(ApiResult.NetworkError, fixture.repository.setTargetTemperature(28.0))
+        assertEquals(ApiResult.NetworkError, fixture.repository.setMode(AirconMode.HEAT))
+        assertEquals(ApiResult.NetworkError, fixture.repository.setPower(false))
         assertEquals(previousSettings, fixture.repository.settings.value)
         assertEquals(previousAircon, fixture.repository.aircon.value)
+    }
+
+    @Test
+    fun `設定に成功したら Success を返す`() = runTest {
+        val fixture = AirconTestFixture()
+
+        assertEquals(ApiResult.Success(Unit), fixture.repository.setTargetTemperature(24.5))
+        assertEquals(ApiResult.Success(Unit), fixture.repository.setMode(AirconMode.DRY))
+        assertEquals(ApiResult.Success(Unit), fixture.repository.setPower(false))
     }
 
     @Test

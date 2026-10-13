@@ -4,15 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.R
 import com.example.androidsampleapp.domain.model.AirconSpec
+import com.example.androidsampleapp.domain.model.ApiResult
+import com.example.androidsampleapp.domain.model.apiError
 import com.example.androidsampleapp.domain.usecase.ObserveAirconSettingsUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveAirconStateUseCase
 import com.example.androidsampleapp.domain.usecase.ObserveConnectionStateUseCase
 import com.example.androidsampleapp.domain.usecase.SetAirconModeUseCase
 import com.example.androidsampleapp.domain.usecase.SetAirconPowerUseCase
 import com.example.androidsampleapp.domain.usecase.SetAirconTemperatureUseCase
+import com.example.androidsampleapp.ui.common.errorMessageRes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +27,7 @@ import kotlinx.coroutines.launch
  *
  * - 機器の現在値、Repository に保存した設定値、接続状態を購読して Reducer に流す。
  * - 操作の Intent を受けたら、[handle] で UseCase を通してコマンドを送り、結果を Intent で戻す。
- *   失敗したときはスナックバーを Effect で出す。
+ *   失敗したときはスナックバーを Effect で出す。サーバの message があればそれを、無ければ失敗の種類ごとの文言を出す。
  */
 @HiltViewModel
 class AirconViewModel @Inject constructor(
@@ -96,15 +98,18 @@ class AirconViewModel @Inject constructor(
         }
     }
 
-    private suspend fun send(command: suspend () -> Unit) {
-        try {
-            command()
-            onIntent(AirconIntent.CommandSucceeded)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            onIntent(AirconIntent.CommandFailed)
-            _effect.send(AirconEffect.ShowMessage(R.string.command_failed))
+    private suspend fun send(command: suspend () -> ApiResult<Unit>) {
+        when (val result = command()) {
+            is ApiResult.Success -> onIntent(AirconIntent.CommandSucceeded)
+            else -> {
+                onIntent(AirconIntent.CommandFailed)
+                _effect.send(
+                    AirconEffect.ShowMessage(
+                        messageRes = result.errorMessageRes() ?: R.string.command_failed,
+                        text = result.apiError?.message,
+                    ),
+                )
+            }
         }
     }
 }

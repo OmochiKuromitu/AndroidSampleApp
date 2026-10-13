@@ -2,6 +2,7 @@ package com.example.androidsampleapp.data
 
 import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.core.AppStateHolder
+import com.example.androidsampleapp.domain.model.ApiResult
 import com.example.androidsampleapp.domain.model.ConnectionState
 import com.example.androidsampleapp.domain.model.IncomingCall
 import com.example.androidsampleapp.domain.repository.DeviceRepository
@@ -14,6 +15,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 
 /**
@@ -53,15 +55,22 @@ class DeviceRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun answerCall(roomId: String) {
-        api.answerCall(CallRequest(deviceId = config.deviceId, roomId = roomId))
-        appStateHolder.updateIncomingCall(null)
-    }
+    override suspend fun answerCall(roomId: String): ApiResult<Unit> =
+        respondToCall { api.answerCall(CallRequest(deviceId = config.deviceId, roomId = roomId)) }
 
-    override suspend fun rejectCall(roomId: String) {
-        api.rejectCall(CallRequest(deviceId = config.deviceId, roomId = roomId))
-        appStateHolder.updateIncomingCall(null)
-    }
+    override suspend fun rejectCall(roomId: String): ApiResult<Unit> =
+        respondToCall { api.rejectCall(CallRequest(deviceId = config.deviceId, roomId = roomId)) }
+
+    /** 応答と拒否は送る API が違うだけで、成功したら着信を消すところは同じ。 */
+    private suspend fun respondToCall(request: suspend () -> Unit): ApiResult<Unit> =
+        runCatching { request() }.fold(
+            onSuccess = {
+                currentCoroutineContext().ensureActive()
+                appStateHolder.updateIncomingCall(null)
+                ApiResult.Success(Unit)
+            },
+            onFailure = { it.toApiResult() },
+        )
 
     private fun applyStatus(status: DeviceStatusResponse) {
         appStateHolder.updateIncomingCall(

@@ -277,7 +277,7 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
   本文に結果コードがあるならレスポンス型に `ResultCodeResponse` を付けて `response.toApiResult { 変換 }` で判定する。
   `Success` に入れるのはドメインの型。ViewModel は `try` / `catch` を書かず、`when` で出し分けて Intent にする。
   失敗を画面に出すなら、サーバの message（`result.apiError?.message`）を優先し、無ければ `result.errorMessageRes()` の既定の文言を Effect で出す。
-  見本は README の「結果を返すだけの API — ApiResult」と `data/ApiResultMappingTest`。
+  見本は `data/AirconRepositoryImpl` と `ui/aircon/AirconViewModel`（README の「結果を返すだけの API — ApiResult」）。
 - **サーバの文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
   domain の `companion object` に `fromCode` を書かない。domain が通信の言葉を知ると、
   形式が変わったときに domain まで直すことになる。送る向き（`AirconMode.toCode()`）も同じ場所。
