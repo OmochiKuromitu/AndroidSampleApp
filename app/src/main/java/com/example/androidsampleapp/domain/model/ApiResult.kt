@@ -13,7 +13,7 @@ package com.example.androidsampleapp.domain.model
 sealed interface ApiResult<out T> {
     data class Success<T>(val data: T) : ApiResult<T>
 
-    /** HTTP 200 だが、本文の resultCode が成功（0）以外だった。 */
+    /** HTTP 200 だが、本文の結果コード（JSON の res）が成功（0）以外だった。 */
     data class BusinessError(val resultCode: Int) : ApiResult<Nothing>
 
     /**

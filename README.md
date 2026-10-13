@@ -305,8 +305,8 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 
 | 結果 | 起きたこと |
 | --- | --- |
-| `Success(data)` | HTTP 200 で、本文の `resultCode` が 0（または結果コードを持たない API） |
-| `BusinessError(resultCode)` | HTTP 200 だが、本文の `resultCode` が 0 以外 |
+| `Success(data)` | HTTP 200 で、本文の `res` が 0（または結果コードを持たない API） |
+| `BusinessError(resultCode)` | HTTP 200 だが、本文の `res` が 0 以外。`resultCode` に `res` の値が入る |
 | `Timeout` | 接続・読み込み・書き込み・呼び出し全体のどれかがタイムアウト。サーバが 408 / 504 を返したときも含む |
 | `ClientError(httpCode, error)` | HTTP 4xx。サーバがエラー本文を返していれば `error` に `code` と `message` が入る |
 | `ServerError(httpCode, error)` | HTTP 5xx。同上 |
@@ -314,10 +314,10 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 | `Unknown(cause)` | JSON が読めないなど、上のどれでもない失敗 |
 
 ```kotlin
-// model/ — 本文に結果コードを持つなら ResultCodeResponse を付ける
+// model/ — 本文に結果コード（{"res": 0, ...}）を持つなら ResultCodeResponse を付ける
 @Serializable
 data class XxxListResponse(
-    override val resultCode: Int,
+    override val res: Int,
     val items: List<XxxResponse> = emptyList(),   // 失敗時に無くても読めるよう既定値を付ける
 ) : ResultCodeResponse
 

@@ -66,17 +66,17 @@ class ApiResultMappingTest {
         )
 
     @Test
-    fun `200 で resultCode が 0 なら成功`() = runTest {
-        server.enqueue(MockResponse().setBody("""{"resultCode":0,"items":["a","b"]}"""))
+    fun `200 で res が 0 なら成功`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"res":0,"items":["a","b"]}"""))
 
         // レスポンスがそのまま入る。
-        assertEquals(ApiResult.Success(ApiResultSampleResponse(resultCode = 0, items = listOf("a", "b"))), call())
+        assertEquals(ApiResult.Success(ApiResultSampleResponse(res = 0, items = listOf("a", "b"))), call())
     }
 
     @Test
-    fun `200 でも resultCode が 0 以外なら BusinessError`() = runTest {
+    fun `200 でも res が 0 以外なら BusinessError`() = runTest {
         // 失敗のときは items が無くても読める。
-        server.enqueue(MockResponse().setBody("""{"resultCode":3}"""))
+        server.enqueue(MockResponse().setBody("""{"res":3}"""))
 
         assertEquals(ApiResult.BusinessError(3), call())
     }
@@ -178,7 +178,7 @@ class ApiResultMappingTest {
 
 @Serializable
 internal data class ApiResultSampleResponse(
-    override val resultCode: Int,
+    override val res: Int,
     val items: List<String> = emptyList(),
 ) : ResultCodeResponse
 

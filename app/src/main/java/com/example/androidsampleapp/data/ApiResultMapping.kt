@@ -23,14 +23,14 @@ import retrofit2.HttpException
 // onSuccess / onFailure（fold ではない方）は処理を挟むだけで戻り値の型を変えられないので、fold を使う。
 
 /**
- * HTTP 200 で返った本文を、resultCode で成功と失敗に分ける。
+ * HTTP 200 で返った本文を、res で成功と失敗に分ける。
  * 成功ならレスポンスをそのまま [ApiResult.Success] に包む。
  */
 fun <R : ResultCodeResponse> R.toApiResult(): ApiResult<R> =
-    if (resultCode == ResultCodeResponse.SUCCESS) {
+    if (res == ResultCodeResponse.SUCCESS) {
         ApiResult.Success(this)
     } else {
-        ApiResult.BusinessError(resultCode)
+        ApiResult.BusinessError(res)
     }
 
 /**
