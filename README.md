@@ -321,17 +321,17 @@ data class XxxListResponse(
     val items: List<XxxResponse> = emptyList(),   // 失敗時に無くても読めるよう既定値を付ける
 ) : ResultCodeResponse
 
-// data/ — runCatching の結果を fold で ApiResult にする
-override suspend fun getXxxList(): ApiResult<List<Xxx>> =
+// data/ — runCatching の結果を fold で ApiResult にする。成功ならレスポンスがそのまま Success に入る
+override suspend fun getXxxList(): ApiResult<XxxListResponse> =
     runCatching { api.getXxxList() }.fold(
-        onSuccess = { response -> response.toApiResult { it.items.map { item -> item.toDomain() } } },
+        onSuccess = { it.toApiResult() },
         onFailure = { it.toApiResult() },
     )
 
 // ui/ — 成功なら Intent で State に入れる。失敗は Effect で文言を出す
 viewModelScope.launch {
     when (val result = getXxxList()) {
-        is ApiResult.Success -> onIntent(XxxIntent.Loaded(result.data))
+        is ApiResult.Success -> onIntent(XxxIntent.Loaded(result.data.items))
         else -> {
             onIntent(XxxIntent.LoadFailed)
             // サーバの message があればそれを、無ければ失敗の種類ごとの既定の文言を出す
@@ -357,10 +357,9 @@ is XxxEffect.ShowMessage ->
 `else` にまとめずに種類ごとに書く。`else` を書かなければ、`ApiResult` に種類を足したときに
 書き忘れている箇所がコンパイルエラーで見つかる。
 
-- 結果コードを持たない API は、`onSuccess = { ApiResult.Success(it.toDomain()) }` と書く。
+- 結果コードを持たない API は、`onSuccess = { ApiResult.Success(it) }` と書く。
   中身の無い API は `ApiResult<Unit>` にして `ApiResult.Success(Unit)` を返す。
-- `Success` に入れるのはドメインの型。`ApiResult` は domain に置いているので、
-  ここに `model/` の型を入れると ViewModel が通信の型を知ることになる。
+- `Success` にはレスポンスをそのまま入れる。変換が要る API だけ、Repository の `onSuccess` で変換してから包む。
 - `onSuccess { }` / `onFailure { }`（`fold` ではない方）は戻り値の型を変えられないので、`fold` を使う。
 - 4xx / 5xx のエラー本文は `model/ApiErrorResponse`（`{"code":"...","message":"..."}`）として読み、
   `domain/model/ApiError` にして持たせる。本文が空や HTML のエラーページなど、想定した JSON でなければ `error` は null。

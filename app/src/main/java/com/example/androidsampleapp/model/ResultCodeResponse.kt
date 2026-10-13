@@ -4,7 +4,7 @@ package com.example.androidsampleapp.model
  * 本文に結果コードを持つレスポンス。HTTP 200 でも、resultCode が 0 以外なら失敗として扱う。
  *
  * レスポンス型（`@Serializable data class`）にこの interface を付けると、
- * Repository で `response.toApiResult { ... }` と書いて判定できる。
+ * Repository で `response.toApiResult()` と書いて判定できる。成功ならレスポンスがそのまま `Success` に入る。
  */
 interface ResultCodeResponse {
     val resultCode: Int

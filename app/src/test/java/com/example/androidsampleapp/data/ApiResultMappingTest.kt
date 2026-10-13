@@ -59,9 +59,9 @@ class ApiResultMappingTest {
     }
 
     /** Repository に書くのと同じ形。 */
-    private suspend fun call(): ApiResult<List<String>> =
+    private suspend fun call(): ApiResult<ApiResultSampleResponse> =
         runCatching { api.get() }.fold(
-            onSuccess = { response -> response.toApiResult { it.items } },
+            onSuccess = { it.toApiResult() },
             onFailure = { it.toApiResult() },
         )
 
@@ -69,7 +69,8 @@ class ApiResultMappingTest {
     fun `200 で resultCode が 0 なら成功`() = runTest {
         server.enqueue(MockResponse().setBody("""{"resultCode":0,"items":["a","b"]}"""))
 
-        assertEquals(ApiResult.Success(listOf("a", "b")), call())
+        // レスポンスがそのまま入る。
+        assertEquals(ApiResult.Success(ApiResultSampleResponse(resultCode = 0, items = listOf("a", "b"))), call())
     }
 
     @Test

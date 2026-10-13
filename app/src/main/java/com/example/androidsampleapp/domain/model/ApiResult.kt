@@ -6,7 +6,7 @@ package com.example.androidsampleapp.domain.model
  * 例外を投げずに戻り値で失敗を返すので、呼ぶ側に try / catch は要らない。
  * キャンセルだけは結果にせず、例外のまま伝える（画面を離れたあとに失敗の表示を出さないため）。
  *
- * [Success] の中身は Retrofit のレスポンス型ではなく、変換後のドメインの型を入れる。
+ * [Success] の中身は、Retrofit のレスポンスをそのまま入れてよい。変換が要るなら Repository で行う。
  * 中身の無い API は `ApiResult<Unit>` にする。
  * 失敗の側は `ApiResult<Nothing>` なので、どの `T` の結果にもそのまま入る。
  */

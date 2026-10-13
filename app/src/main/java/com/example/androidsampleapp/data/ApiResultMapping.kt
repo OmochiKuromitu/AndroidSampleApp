@@ -12,21 +12,23 @@ import retrofit2.HttpException
 
 // Retrofit の呼び出し結果を ApiResult にする。Repository で次のように使う。
 //
-//   override suspend fun getXxxList(): ApiResult<List<Xxx>> =
+//   override suspend fun getXxxList(): ApiResult<XxxListResponse> =
 //       runCatching { api.getXxxList() }.fold(
-//           onSuccess = { response -> response.toApiResult { it.items.map { item -> item.toDomain() } } },
+//           onSuccess = { it.toApiResult() },
 //           onFailure = { it.toApiResult() },
 //       )
+//
+// 結果コードを持たないレスポンスなら onSuccess = { ApiResult.Success(it) } と書く。
 //
 // onSuccess / onFailure（fold ではない方）は処理を挟むだけで戻り値の型を変えられないので、fold を使う。
 
 /**
  * HTTP 200 で返った本文を、resultCode で成功と失敗に分ける。
- * 成功なら [transform] でドメインの型に変えて [ApiResult.Success] に包む。
+ * 成功ならレスポンスをそのまま [ApiResult.Success] に包む。
  */
-inline fun <R : ResultCodeResponse, T> R.toApiResult(transform: (R) -> T): ApiResult<T> =
+fun <R : ResultCodeResponse> R.toApiResult(): ApiResult<R> =
     if (resultCode == ResultCodeResponse.SUCCESS) {
-        ApiResult.Success(transform(this))
+        ApiResult.Success(this)
     } else {
         ApiResult.BusinessError(resultCode)
     }

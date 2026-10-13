@@ -274,8 +274,8 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
     同じ値を入れ直しても流れないので、結果が前と同じだったときに読み込み中のまま止まる。
 - **呼んだ画面が結果を受け取れば済む（共有状態に入れない）** — Repository は `domain/model/ApiResult<T>` を返す。
   `runCatching { api.xxx() }.fold(onSuccess = { ... }, onFailure = { it.toApiResult() })` と書き、
-  本文に結果コードがあるならレスポンス型に `ResultCodeResponse` を付けて `response.toApiResult { 変換 }` で判定する。
-  `Success` に入れるのはドメインの型。ViewModel は `try` / `catch` を書かず、`when` で出し分けて Intent にする。
+  本文に結果コードがあるならレスポンス型に `ResultCodeResponse` を付けて `response.toApiResult()` で判定する。
+  成功ならレスポンスがそのまま `Success` に入る。ViewModel は `try` / `catch` を書かず、`when` で出し分けて Intent にする。
   失敗を画面に出すなら、サーバの message（`result.apiError?.message`）を優先し、無ければ `result.errorMessageRes()` の既定の文言を Effect で出す。
   見本は `data/AirconRepositoryImpl` と `ui/aircon/AirconViewModel`（README の「結果を返すだけの API — ApiResult」）。
 - **サーバの文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
