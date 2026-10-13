@@ -272,6 +272,11 @@ HTTP のように能動的に取りに行くものは、取得のきっかけを
   - State は「一度でも受け取れたか」のフラグを持ち、読み込み中はそこから決める
     （`ContactState.isLoading` が見本）。取り直しの完了を Intent で待つと、`StateFlow` は
     同じ値を入れ直しても流れないので、結果が前と同じだったときに読み込み中のまま止まる。
+- **呼んだ画面が結果を受け取れば済む（共有状態に入れない）** — Repository は `domain/model/ApiResult<T>` を返す。
+  `runCatching { api.xxx() }.fold(onSuccess = { ... }, onFailure = { it.toApiResult() })` と書き、
+  本文に結果コードがあるならレスポンス型に `ResultCodeResponse` を付けて `response.toApiResult { 変換 }` で判定する。
+  `Success` に入れるのはドメインの型。ViewModel は `try` / `catch` を書かず、`when` で出し分けて Intent にする。
+  見本は README の「結果を返すだけの API — ApiResult」と `data/ApiResultMappingTest`。
 - **サーバの文字列（`"COOL"`、`"CONTACT_MISSED"` など）との対応は `data/CodeMapping` に置く。**
   domain の `companion object` に `fromCode` を書かない。domain が通信の言葉を知ると、
   形式が変わったときに domain まで直すことになる。送る向き（`AirconMode.toCode()`）も同じ場所。

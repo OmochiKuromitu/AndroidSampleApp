@@ -285,6 +285,62 @@ Repository が `StateFlow` で公開する。ViewModel は購読 UseCase を通�
 - 電話帳・履歴は画面の生成時、不在着信の件数と通知は起動直後・タブ移動・スリープ表示時に取り直す。
   定期的な取り直しはしていない。
 
+## 結果を返すだけの API — ApiResult
+
+共有状態に入れず、呼んだ画面が結果を受け取れば済む API は、Repository が `domain/model/ApiResult` を返す。
+例外を投げずに戻り値で失敗を返すので、ViewModel に `try` / `catch` は要らず、`when` で出し分けるだけになる。
+
+| 結果 | 起きたこと |
+| --- | --- |
+| `Success(data)` | HTTP 200 で、本文の `resultCode` が 0（または結果コードを持たない API） |
+| `BusinessError(resultCode)` | HTTP 200 だが、本文の `resultCode` が 0 以外 |
+| `Timeout` | 接続・読み込み・呼び出し全体のどれかがタイムアウト |
+| `ClientError(httpCode)` | HTTP 4xx |
+| `ServerError(httpCode)` | HTTP 5xx |
+| `NetworkError` | 圏外・接続拒否・切断など、タイムアウト以外の通信エラー |
+| `Unknown(cause)` | JSON が読めないなど、上のどれでもない失敗 |
+
+```kotlin
+// model/ — 本文に結果コードを持つなら ResultCodeResponse を付ける
+@Serializable
+data class XxxListResponse(
+    override val resultCode: Int,
+    val items: List<XxxResponse> = emptyList(),   // 失敗時に無くても読めるよう既定値を付ける
+) : ResultCodeResponse
+
+// data/ — runCatching の結果を fold で ApiResult にする
+override suspend fun getXxxList(): ApiResult<List<Xxx>> =
+    runCatching { api.getXxxList() }.fold(
+        onSuccess = { response -> response.toApiResult { it.items.map { item -> item.toDomain() } } },
+        onFailure = { it.toApiResult() },
+    )
+
+// ui/ — when で出し分ける。else を書かず、種類を足したときに書き忘れをコンパイルエラーで見つける
+viewModelScope.launch {
+    when (val result = getXxxList()) {
+        is ApiResult.Success -> onIntent(XxxIntent.Loaded(result.data))
+        is ApiResult.BusinessError -> onIntent(XxxIntent.BusinessFailed(result.resultCode))
+        ApiResult.Timeout -> onIntent(XxxIntent.TimedOut)
+        is ApiResult.ClientError,
+        is ApiResult.ServerError,
+        ApiResult.NetworkError,
+        is ApiResult.Unknown,
+        -> onIntent(XxxIntent.LoadFailed)
+    }
+}
+```
+
+- 結果コードを持たない API は、`onSuccess = { ApiResult.Success(it.toDomain()) }` と書く。
+  中身の無い API は `ApiResult<Unit>` にして `ApiResult.Success(Unit)` を返す。
+- `Success` に入れるのはドメインの型。`ApiResult` は domain に置いているので、
+  ここに `model/` の型を入れると ViewModel が通信の型を知ることになる。
+- `onSuccess { }` / `onFailure { }`（`fold` ではない方）は戻り値の型を変えられないので、`fold` を使う。
+- キャンセルは結果にせず投げ直す（`data/ApiResultMapping` の `Throwable.toApiResult()` が行う）。
+  `runCatching` はキャンセルも捕まえるので、結果に変えると閉じた画面に失敗の表示が流れる。
+- タイムアウトは `InterruptedIOException` で判定する。接続・読み込みのタイムアウト（`SocketTimeoutException`）も
+  OkHttp の `callTimeout`（`InterruptedIOException("timeout")`）もこれの仲間で、どちらも `IOException` の仲間でもある。
+  秒数は `di/NetworkModule` の `OkHttpClient` で決める。
+
 ## ディレクトリ
 
 ```
@@ -296,7 +352,7 @@ app/src/main/java/com/example/androidsampleapp/
 │   └── mvi/                UiState / UiIntent / UiEffect / Reducer
 ├── di/                     Hilt モジュール（AppModule / NetworkModule / RepositoryModule / Qualifiers）
 ├── domain/
-│   ├── model/              Aircon / AirconSettings / AirconSpec / ConnectionState / IncomingCall / Notice
+│   ├── model/              Aircon / AirconSettings / AirconSpec / ApiResult / ConnectionState / IncomingCall / Notice
 │   ├── repository/         DeviceRepository / AirconRepository / NoticeRepository / ContactRepository（interface）
 │   └── usecase/            ObserveXxx / SetXxx / AnswerCall …
 ├── data/                   Repository 実装
