@@ -46,6 +46,7 @@ class AirconRepositoryImpl @Inject constructor(
         runCatching { api.setAirconPower(AirconPowerRequest(deviceId = config.deviceId, isOn = isOn)) }.fold(
             onSuccess = { response ->
                 currentCoroutineContext().ensureActive()
+                if (response.res != 0) return@fold ApiResult.BusinessError(response.res)
                 apply(response)
                 ApiResult.Success(Unit)
             },
@@ -56,6 +57,7 @@ class AirconRepositoryImpl @Inject constructor(
         runCatching { api.setAirconMode(AirconModeRequest(deviceId = config.deviceId, mode = mode.toCode())) }.fold(
             onSuccess = { response ->
                 currentCoroutineContext().ensureActive()
+                if (response.res != 0) return@fold ApiResult.BusinessError(response.res)
                 _settings.update { it.copy(mode = airconModeOf(response.mode)) }
                 apply(response)
                 ApiResult.Success(Unit)
@@ -69,6 +71,7 @@ class AirconRepositoryImpl @Inject constructor(
         }.fold(
             onSuccess = { response ->
                 currentCoroutineContext().ensureActive()
+                if (response.res != 0) return@fold ApiResult.BusinessError(response.res)
                 _settings.update { it.copy(targetTemperature = response.targetTemperature) }
                 apply(response)
                 ApiResult.Success(Unit)

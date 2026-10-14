@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
  *
  * - 機器の現在値、Repository に保存した設定値、接続状態を購読して Reducer に流す。
  * - 操作の Intent を受けたら、[handle] で UseCase を通してコマンドを送り、結果を Intent で戻す。
- *   失敗したときはスナックバーを Effect で出す。サーバの message があればそれを、無ければ失敗の種類ごとの文言を出す。
+ *   業務エラーは結果コード付きのダイアログ、それ以外の失敗はスナックバーを Effect で出す。
+ *   サーバの message があればそれを、無ければ失敗の種類ごとの文言を出す。
  */
 @HiltViewModel
 class AirconViewModel @Inject constructor(
@@ -101,6 +102,10 @@ class AirconViewModel @Inject constructor(
     private suspend fun send(command: suspend () -> ApiResult<Unit>) {
         when (val result = command()) {
             is ApiResult.Success -> onIntent(AirconIntent.CommandSucceeded)
+            is ApiResult.BusinessError -> {
+                onIntent(AirconIntent.CommandFailed)
+                _effect.send(AirconEffect.ShowErrorDialog(result.resultCode))
+            }
             else -> {
                 onIntent(AirconIntent.CommandFailed)
                 _effect.send(
