@@ -23,7 +23,9 @@ data class AirconStatusResponse(
     val mode: String,
     val targetTemperature: Double,
     val roomTemperature: Double,
-)
+    /** 状態取得では省略可。操作応答ではサーバの結果コードを受け取る。 */
+    override val res: Int = ResultCodeResponse.SUCCESS,
+) : ResultCodeResponse
 
 /** 着信 1 件。 */
 @Serializable

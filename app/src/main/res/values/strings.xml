@@ -55,6 +55,7 @@
 
     <!-- API の失敗。サーバが message を返したときはそちらを出す -->
     <string name="api_error_business">処理できませんでした</string>
+    <string name="aircon_error_result_code">処理できませんでした（結果コード: %1$d）</string>
     <string name="api_error_timeout">通信がタイムアウトしました。時間をおいてもう一度お試しください</string>
     <string name="api_error_client">要求を受け付けられませんでした</string>
     <string name="api_error_server">サーバでエラーが発生しました。時間をおいてもう一度お試しください</string>

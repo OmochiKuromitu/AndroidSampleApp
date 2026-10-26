@@ -46,6 +46,6 @@ sealed interface AirconIntent : UiIntent {
      */
     data object CommandSucceeded : AirconIntent
 
-    /** コマンドを送れなかった。スナックバーは Effect で別に出す。 */
+    /** コマンドに失敗した。エラーの表示は Effect で別に出す。 */
     data object CommandFailed : AirconIntent
 }

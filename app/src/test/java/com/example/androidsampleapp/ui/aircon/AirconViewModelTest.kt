@@ -62,6 +62,20 @@ class AirconViewModelTest {
     }
 
     @Test
+    fun `業務エラーなら結果コードをダイアログに渡して送信状態を解除する`() = runTest {
+        val fixture = AirconTestFixture()
+        fixture.api.status = fixture.api.status.copy(res = 123)
+        val viewModel = viewModel(fixture)
+
+        viewModel.onIntent(AirconIntent.ModeSelected(AirconMode.DRY))
+        runCurrent()
+
+        assertEquals(AirconEffect.ShowErrorDialog(123), viewModel.effect.first())
+        assertEquals(AirconSettings(), viewModel.uiState.value.settings)
+        assertFalse(viewModel.uiState.value.isSendingCommand)
+    }
+
+    @Test
     fun `初回表示はデフォルト設定を使い、電源と室温は機器の現在値を使う`() = runTest {
         val fixture = AirconTestFixture()
         val viewModel = viewModel(fixture)

@@ -19,6 +19,21 @@ import org.junit.Test
 class AirconRepositoryImplTest {
 
     @Test
+    fun `res が非ゼロなら全操作でコードを返し状態を変更しない`() = runTest {
+        val fixture = AirconTestFixture()
+        val previousSettings = fixture.repository.settings.value
+        val previousAircon = fixture.repository.aircon.value
+        // Success(Unit) ではなく、Fake API が返すレスポンスを差し替える。
+        fixture.api.status = fixture.api.status.copy(res = 123)
+
+        assertEquals(ApiResult.BusinessError(123), fixture.repository.setMode(AirconMode.DRY))
+        assertEquals(ApiResult.BusinessError(123), fixture.repository.setTargetTemperature(28.0))
+        assertEquals(ApiResult.BusinessError(123), fixture.repository.setPower(false))
+        assertEquals(previousSettings, fixture.repository.settings.value)
+        assertEquals(previousAircon, fixture.repository.aircon.value)
+    }
+
+    @Test
     fun `未設定なら機器の現在値に関係なく温度とモードはデフォルト`() = runTest {
         val fixture = AirconTestFixture()
         backgroundScope.launch { fixture.deviceRepository.monitor() }
