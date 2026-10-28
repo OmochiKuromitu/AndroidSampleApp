@@ -1,0 +1,47 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:ContactScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ContactScreen( state: ContactState, onListSelect: (ContactList) -&gt; Unit, onNoticeClick: (Notice) -&gt; Unit, onClearNoticesClick: () -&gt; Unit, onClearNoticesConfirm: () -&gt; Unit, onClearNoticesDismiss: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>CyclomaticComplexMethod:FakeApiInterceptor.kt$FakeApiInterceptor$private fun respond(request: Request): Pair&lt;Int, String&gt;</ID>
+    <ID>LongParameterList:ContactViewModel.kt$ContactViewModel$( savedStateHandle: SavedStateHandle, observeAddressBook: ObserveAddressBookUseCase, observeMissedCallCount: ObserveMissedCallCountUseCase, observeNotices: ObserveNoticesUseCase, private val refreshAddressBook: RefreshAddressBookUseCase, private val markMissedCallsAsRead: MarkMissedCallsAsReadUseCase, private val clearNotices: ClearNoticesUseCase, )</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$400</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$408</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$499</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$500</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$504</ID>
+    <ID>MagicNumber:ApiResultMapping.kt$599</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$12</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$20</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$200</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$204</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$299</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$3</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$30</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$400</ID>
+    <ID>MagicNumber:FakeApiInterceptor.kt$FakeApiInterceptor$404</ID>
+    <ID>MatchingDeclarationName:Previews.kt$PanelPreview</ID>
+    <ID>MatchingDeclarationName:Qualifiers.kt$ApplicationScope</ID>
+    <ID>MaxLineLength:ContactScreen.kt$Notice("1", NoticeCategory.ALERT, "フィルター", "フィルターの清掃時期です", PREVIEW_NOW - 3 * PREVIEW_HOUR, NoticeDestination.Aircon)</ID>
+    <ID>MaxLineLength:NoticeRepositoryImplTest.kt$NoticeRepositoryImplTest$server.enqueue(MockResponse().setBody("""[{"id":"1","category":"INFO","message":"m","occurredAt":1,"destination":"TOP"}]"""))</ID>
+    <ID>MaxLineLength:NoticeRepositoryImplTest.kt$NoticeRepositoryImplTest$server.enqueue(MockResponse().setBody("""[{"id":"new","category":"INFO","message":"m","occurredAt":2,"destination":"TOP"}]"""))</ID>
+    <ID>MaxLineLength:SleepScreen.kt$Notice("2", NoticeCategory.ALERT, "フィルター", "フィルターの清掃時期です", PREVIEW_NOW - 3 * PREVIEW_HOUR, NoticeDestination.Aircon)</ID>
+    <ID>MaxLineLength:SleepScreen.kt$Notice("3", NoticeCategory.AIRCON, "リビング", "設定温度を 26.0 度に変更しました", PREVIEW_NOW - 12 * PREVIEW_HOUR, NoticeDestination.Aircon)</ID>
+    <ID>ReturnCount:FakeApiInterceptor.kt$FakeApiInterceptor$private fun respond(request: Request): Pair&lt;Int, String&gt;</ID>
+    <ID>SwallowedException:ApiResultMapping.kt$e: IOException</ID>
+    <ID>SwallowedException:ApiResultMapping.kt$e: IllegalArgumentException</ID>
+    <ID>SwallowedException:ContactViewModel.kt$ContactViewModel$e: Exception</ID>
+    <ID>SwallowedException:DeviceRepositoryImpl.kt$DeviceRepositoryImpl$e: Exception</ID>
+    <ID>SwallowedException:MissedCallViewModel.kt$MissedCallViewModel$e: Exception</ID>
+    <ID>SwallowedException:SleepViewModel.kt$SleepViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ContactViewModel.kt$ContactViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DeviceRepositoryImpl.kt$DeviceRepositoryImpl$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MissedCallViewModel.kt$MissedCallViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NoticeRepositoryImpl.kt$NoticeRepositoryImpl$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SleepViewModel.kt$SleepViewModel$e: Exception</ID>
+    <ID>TooManyFunctions:FakeApiInterceptor.kt$FakeApiInterceptor : Interceptor</ID>
+    <ID>UnusedParameter:AirconViewModel.kt$AirconViewModel$current: AirconState</ID>
+    <ID>UnusedParameter:ContactViewModel.kt$ContactViewModel$previous: ContactState</ID>
+    <ID>UnusedParameter:TopViewModel.kt$TopViewModel$current: TopState</ID>
+  </CurrentIssues>
+</SmellBaseline>

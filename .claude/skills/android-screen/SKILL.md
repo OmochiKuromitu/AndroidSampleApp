@@ -360,3 +360,7 @@ Reducer は Android に依存しない純粋な処理なので JVM テストで�
 
 `README.md` の該当セクションも直す。設計の理由はあちらに書いてあるので、
 構成を変えたのに README が古いままだと、次の人が理由の分からない規約に従うことになる。
+
+push する前に `./gradlew lintMockDebug detekt jacocoMockDebugUnitTestReport` を通す。
+Lint と detekt はベースラインにない指摘で失敗する。新しい指摘はベースラインに足さずに直すか、
+理由を書いて個別に抑制する（`@Suppress("ルールの ID")` / `@SuppressLint("ルールの ID")`）。詳しくは `docs/static-analysis.md`。

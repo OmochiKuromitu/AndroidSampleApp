@@ -437,6 +437,13 @@ Reducer は Android に依存しない純粋な処理なので、JVM テスト�
 マネージャー、`IdleTimer`、`FakeApiInterceptor` のテストがある。
 時間に依存するものは `kotlinx-coroutines-test` の `runTest` と仮想時間で書く。
 
+静的解析（Android Lint、detekt、MobSF）とカバレッジ（JaCoCo）は [docs/static-analysis.md](docs/static-analysis.md) にまとめてある。
+手元では次の 1 行で、Lint・detekt・単体テストとカバレッジをまとめて実行できる。
+
+```
+./gradlew lintMockDebug detekt jacocoMockDebugUnitTestReport
+```
+
 ---
 
 # 第 2 部 サンプルの題材と仕様

@@ -1,0 +1,127 @@
+# 静的解析とカバレッジ。使い方と、結果の見方・ベースラインの更新は docs/static-analysis.md。
+name: static-analysis
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+# 同じブランチで新しく push されたら、古い実行は止める。
+concurrency:
+  group: static-analysis-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Android Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android Lint
+        run: |
+          if [ -f app/lint-baseline.xml ]; then
+            ./gradlew lintMockDebug
+          else
+            # ベースラインがまだ無いときは作るだけで止めない。作ったものは成果物から取ってコミットする。
+            ./gradlew lintMockDebug -Dlint.baselines.continue=true
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: |
+            app/build/reports/lint-results-mockDebug.*
+            app/lint-baseline.xml
+          if-no-files-found: ignore
+
+  detekt:
+    name: detekt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: detekt
+        run: ./gradlew detekt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detekt-report
+          path: app/build/reports/detekt/
+          if-no-files-found: ignore
+
+  unit-test-coverage:
+    name: 単体テストと JaCoCo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 単体テストとカバレッジ
+        run: ./gradlew jacocoMockDebugUnitTestReport
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: |
+            app/build/reports/jacoco/jacocoMockDebugUnitTestReport/
+            app/build/reports/tests/testMockDebugUnitTest/
+          if-no-files-found: ignore
+
+  mobsf:
+    name: MobSF
+    runs-on: ubuntu-latest
+    services:
+      mobsf:
+        # 結果が勝手に変わらないようにバージョンを固定する。上げ方は docs/static-analysis.md。
+        image: opensecurity/mobile-security-framework-mobsf:v4.5.3
+        ports:
+          - 8000:8000
+        env:
+          # このジョブの中からしか届かない使い捨てのコンテナなので、固定値でよい。
+          MOBSF_API_KEY: ci-mobsf-api-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 配布する構成（product の release）を調べる。署名していない APK でも解析できる。
+      - name: APK を作る
+        run: ./gradlew assembleProductRelease
+
+      - name: MobSF で解析
+        env:
+          MOBSF_URL: http://localhost:8000
+          MOBSF_API_KEY: ci-mobsf-api-key
+        run: scripts/mobsf-scan.sh app/build/outputs/apk/product/release/app-product-release-unsigned.apk build/reports/mobsf
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobsf-report
+          path: build/reports/mobsf/
+          if-no-files-found: ignore

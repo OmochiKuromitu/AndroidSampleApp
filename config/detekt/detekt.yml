@@ -1,0 +1,29 @@
+# detekt の設定。既定のルールに対して、このリポジトリで変えたいところだけを書く（buildUponDefaultConfig = true）。
+# 既定値の一覧は https://github.com/detekt/detekt/blob/v1.23.7/detekt-core/src/main/resources/default-detekt-config.yml
+#
+# ここで外しているのは、Jetpack Compose の書き方に由来する誤検知だけ。
+# それ以外の既存の指摘は config/detekt/baseline.xml に入れてあり、新しく書いたコードだけが検査される。
+
+naming:
+  FunctionNaming:
+    # Composable は大文字で始める決まり（TopScreen、IncomingCallCard など）。
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    # ui/theme の色（TagCall など）は定数として大文字で始める。
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+complexity:
+  LongParameterList:
+    # Screen は操作ごとのコールバックを受け取るので、引数が多くなる（skill の「XxxScreen は表示だけ」）。
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+
+style:
+  UnusedPrivateMember:
+    # プレビュー関数は private で、Android Studio からしか呼ばれない。
+    ignoreAnnotated: ['Preview', 'PanelPreview']
+  MagicNumber:
+    # ui/theme の色や寸法の定義は、数値そのものが値。
+    ignorePropertyDeclaration: true
+    excludes: ['**/test/**', '**/androidTest/**', '**/ui/theme/**']

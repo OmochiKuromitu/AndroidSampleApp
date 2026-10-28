@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.detekt)
+    jacoco
 }
 
 android {
@@ -45,6 +47,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 単体テストのカバレッジを JaCoCo で取る。結果は jacocoMockDebugUnitTestReport でまとめる。
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -67,6 +73,104 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // AGP が単体テストに付ける JaCoCo のエージェントと、下の jacoco プラグインのバージョンを揃える。
+    testCoverage {
+        jacocoVersion = libs.versions.jacoco.get()
+    }
+
+    // Android Lint。既存の指摘は lint-baseline.xml に入れ、新しく増えたものだけでビルドを止める。
+    // 作り方と更新のしかたは docs/static-analysis.md。
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = false
+        htmlReport = true
+        xmlReport = true
+        sarifReport = true
+    }
+}
+
+// ---- 静的解析とカバレッジ（docs/static-analysis.md） ----
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/baseline.xml")
+    source.setFrom("src/main/java", "src/test/java")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        sarif.required.set(true)
+        txt.required.set(false)
+        md.required.set(false)
+    }
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
+    jvmTarget = "17"
+}
+
+// detekt は自分が作られた Kotlin のバージョンで動く必要がある。
+// このプロジェクトの Kotlin（2.0.21）に引き上げられると起動時に落ちるので、detekt の分だけ戻す。
+configurations.matching { it.name == "detekt" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+        }
+    }
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+
+/** カバレッジの集計から外すクラス。自動生成されたコードを数えると、テストで触れない分だけ率が下がって見える。 */
+val coverageExclusions = listOf(
+    // Android と Gradle が作るもの
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    // Hilt / Dagger が作るもの
+    "**/Hilt_*.*",
+    "**/*_HiltModules*.*",
+    "**/*_Factory*.*",
+    "**/*_MembersInjector.*",
+    "**/*_Provide*Factory*.*",
+    "**/dagger/**",
+    "**/hilt_aggregated_deps/**",
+    // Compose と kotlinx.serialization が作るもの
+    "**/*ComposableSingletons*.*",
+    "**/*\$serializer.*",
+)
+
+tasks.register<JacocoReport>("jacocoMockDebugUnitTestReport") {
+    group = "verification"
+    description = "mockDebug の単体テストを実行し、JaCoCo のカバレッジレポート（HTML / XML）を作る。"
+    dependsOn("testMockDebugUnitTest")
+
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        csv.required.set(false)
+    }
+
+    val buildDir = layout.buildDirectory
+    classDirectories.setFrom(
+        buildDir.dir("tmp/kotlin-classes/mockDebug").map { fileTree(it) { exclude(coverageExclusions) } },
+        buildDir.dir("intermediates/javac/mockDebug/compileMockDebugJavaWithJavac/classes")
+            .map { fileTree(it) { exclude(coverageExclusions) } },
+    )
+    sourceDirectories.setFrom("src/main/java")
+    executionData.setFrom(
+        buildDir.file("outputs/unit_test_code_coverage/mockDebugUnitTest/testMockDebugUnitTest.exec"),
+    )
 }
 
 dependencies {
