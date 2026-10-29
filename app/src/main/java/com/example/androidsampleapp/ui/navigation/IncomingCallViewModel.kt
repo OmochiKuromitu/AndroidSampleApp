@@ -14,8 +14,28 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @HiltViewModel
 class IncomingCallViewModel @Inject constructor(
-    appStateHolder: AppStateHolder,
+    private val appStateHolder: AppStateHolder,
 ) : ViewModel() {
 
     val incomingCall: StateFlow<IncomingCall?> = appStateHolder.incomingCall
+
+    private var activeRoomId: String? = null
+    private var returnToSleep = false
+
+    // 再コンポーズや表示名の更新では遷移しない。画面再生成でも着信前の状態を保持する。
+    fun onCallChanged(call: IncomingCall?, isSleeping: Boolean): CallNavigation? {
+        if (call != null) {
+            if (call.roomId == activeRoomId) return null
+            returnToSleep = if (activeRoomId == null) isSleeping else returnToSleep
+            activeRoomId = call.roomId
+            return CallNavigation.SHOW_CALL
+        }
+        val roomId = activeRoomId ?: return null
+        val shouldSleep = returnToSleep && appStateHolder.answeredRoomId != roomId
+        activeRoomId = null
+        returnToSleep = false
+        return if (shouldSleep) CallNavigation.RETURN_TO_SLEEP else null
+    }
 }
+
+enum class CallNavigation { SHOW_CALL, RETURN_TO_SLEEP }

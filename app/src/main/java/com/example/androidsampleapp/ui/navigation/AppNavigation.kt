@@ -49,9 +49,19 @@ fun AppNavigation(
 
     // 着信したら起こしてトップを出す。検知は IncomingCallRouter、行き先はここ。
     IncomingCallRouter(
+        isSleeping = isSleeping,
         onIncomingCall = {
             navController.navigateToTab(MainTab.TOP)
             idleTimer.wake()
+        },
+        // スリープ中の着信を取らずに終了したら戻す。再取得は下の isSleeping の監視で行う。
+        onMissedCallEnded = {
+            if (idleTimer.isSleeping.value) {
+                // 着信中に無操作タイマーで戻っていた場合も、終了後の履歴を取得する。
+                missedCall.refresh()
+            } else {
+                idleTimer.onSleepRequested()
+            }
         },
     )
 

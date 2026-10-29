@@ -122,6 +122,7 @@ class DeviceRepositoryImplTest {
 
         assertEquals(listOf(CallRequest(deviceId = DEVICE_ID, roomId = "101")), api.answered)
         assertNull(holder.incomingCall.value)
+        assertEquals("101", holder.answeredRoomId)
     }
 
     @Test
@@ -134,6 +135,7 @@ class DeviceRepositoryImplTest {
 
         assertEquals(ApiResult.NetworkError, repository.answerCall("101"))
         assertEquals(call, holder.incomingCall.value)
+        assertNull(holder.answeredRoomId)
     }
 
     private companion object {

@@ -13,12 +13,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  */
 @Composable
 fun IncomingCallRouter(
+    isSleeping: Boolean,
     onIncomingCall: () -> Unit,
+    onMissedCallEnded: () -> Unit,
     viewModel: IncomingCallViewModel = hiltViewModel(),
 ) {
     val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
 
     LaunchedEffect(incomingCall) {
-        if (incomingCall != null) onIncomingCall()
+        when (viewModel.onCallChanged(incomingCall, isSleeping)) {
+            CallNavigation.SHOW_CALL -> onIncomingCall()
+            CallNavigation.RETURN_TO_SLEEP -> onMissedCallEnded()
+            null -> Unit
+        }
     }
 }

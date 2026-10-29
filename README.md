@@ -185,6 +185,12 @@ Route は Effect を `LaunchedEffect(viewModel) { viewModel.effect.collect { ...
 | 通知が選ばれた | `SleepEffect.NoticeSelected(destination)` | その飛び先へ navigate して `wake()` |
 | お知らせタブの通知が選ばれた | `ContactEffect.NoticeSelected(destination)` | その飛び先へ navigate（起きているので `wake()` は不要） |
 | 着信した | `IncomingCallRouter` | トップへ navigate して `wake()` |
+| スリープ中に受けた着信が未応答で終了した | `IncomingCallRouter` | スリープへ戻し、`missedCall.refresh()` で件数と通知一覧を再取得 |
+
+着信前のスリープ状態は `IncomingCallViewModel` が保持する。応答 API が成功した場合は
+`DeviceRepositoryImpl` が着信を消す前に応答済みの部屋を記録し、自動ではスリープへ戻さない。
+拒否した場合は未応答の終了としてスリープへ戻す。着信中にすでにスリープへ戻っていた場合も、
+終了時に再取得する。終了は状態取得 API で着信がなくなった時点で検知する。
 
 Effect の名前が `NavigateToXxx` ではなく `Unlocked` / `NoticeSelected` なのは意図的。
 ViewModel は出来事を報告するだけで、命令はしない。

@@ -56,16 +56,22 @@ class DeviceRepositoryImpl @Inject constructor(
     }
 
     override suspend fun answerCall(roomId: String): ApiResult<Unit> =
-        respondToCall { api.answerCall(CallRequest(deviceId = config.deviceId, roomId = roomId)) }
+        respondToCall(answeredRoomId = roomId) {
+            api.answerCall(CallRequest(deviceId = config.deviceId, roomId = roomId))
+        }
 
     override suspend fun rejectCall(roomId: String): ApiResult<Unit> =
         respondToCall { api.rejectCall(CallRequest(deviceId = config.deviceId, roomId = roomId)) }
 
     /** 応答と拒否は送る API が違うだけで、成功したら着信を消すところは同じ。 */
-    private suspend fun respondToCall(request: suspend () -> Unit): ApiResult<Unit> =
+    private suspend fun respondToCall(
+        answeredRoomId: String? = null,
+        request: suspend () -> Unit,
+    ): ApiResult<Unit> =
         runCatching { request() }.fold(
             onSuccess = {
                 currentCoroutineContext().ensureActive()
+                answeredRoomId?.let { appStateHolder.markCallAnswered(it) }
                 appStateHolder.updateIncomingCall(null)
                 ApiResult.Success(Unit)
             },

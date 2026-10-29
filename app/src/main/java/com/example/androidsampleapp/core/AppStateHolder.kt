@@ -28,6 +28,14 @@ class AppStateHolder @Inject constructor() {
     private val _incomingCall = MutableStateFlow<IncomingCall?>(null)
     val incomingCall: StateFlow<IncomingCall?> = _incomingCall.asStateFlow()
 
+    // 応答成功と着信消去の順序を保ち、画面側で不在終了と区別する。
+    var answeredRoomId: String? = null
+        private set
+
+    fun markCallAnswered(roomId: String) {
+        answeredRoomId = roomId
+    }
+
     private val _aircon = MutableStateFlow(Aircon())
     val aircon: StateFlow<Aircon> = _aircon.asStateFlow()
 
@@ -36,6 +44,9 @@ class AppStateHolder @Inject constructor() {
     }
 
     fun updateIncomingCall(call: IncomingCall?) {
+        if (call != null && call.roomId != _incomingCall.value?.roomId) {
+            answeredRoomId = null
+        }
         _incomingCall.value = call
     }
 
