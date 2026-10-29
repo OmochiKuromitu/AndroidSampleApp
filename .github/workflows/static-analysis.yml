@@ -92,17 +92,23 @@ jobs:
   mobsf:
     name: MobSF
     runs-on: ubuntu-latest
-    services:
-      mobsf:
-        # 結果が勝手に変わらないようにバージョンを固定する。上げ方は docs/static-analysis.md。
-        image: opensecurity/mobile-security-framework-mobsf:v4.5.3
-        ports:
-          - 8000:8000
-        env:
-          # このジョブの中からしか届かない使い捨てのコンテナなので、固定値でよい。
-          MOBSF_API_KEY: ci-mobsf-api-key
+    env:
+      # 結果が勝手に変わらないようにバージョンを固定する。上げ方は docs/static-analysis.md。
+      # Podman は短い名前だとどのレジストリから取るかを設定に頼るので、docker.io/ から書く。
+      MOBSF_IMAGE: docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3
+      # このジョブの中からしか届かない使い捨てのコンテナなので、固定値でよい。
+      MOBSF_API_KEY: ci-mobsf-api-key
+      MOBSF_URL: http://localhost:8000
     steps:
       - uses: actions/checkout@v4
+
+      # ubuntu-latest のランナーには Podman が入っている。services: は Docker でしか動かないので、ここで起動する。
+      # APK を作っている間に起動が進むよう、先に立ち上げておく。
+      - name: MobSF を起動（Podman）
+        run: |
+          podman --version
+          podman run --rm -d --name mobsf -p 8000:8000 -e MOBSF_API_KEY="$MOBSF_API_KEY" "$MOBSF_IMAGE"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -114,10 +120,15 @@ jobs:
         run: ./gradlew assembleProductRelease
 
       - name: MobSF で解析
-        env:
-          MOBSF_URL: http://localhost:8000
-          MOBSF_API_KEY: ci-mobsf-api-key
         run: scripts/mobsf-scan.sh app/build/outputs/apk/product/release/app-product-release-unsigned.apk build/reports/mobsf
+
+      - name: MobSF のログ（失敗したとき）
+        if: failure()
+        run: podman logs mobsf || true
+
+      - name: MobSF を止める
+        if: always()
+        run: podman stop mobsf || true
 
       - uses: actions/upload-artifact@v4
         if: always()

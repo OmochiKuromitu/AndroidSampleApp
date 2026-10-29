@@ -15,7 +15,7 @@ Gradle で動く 3 つをまとめて実行するなら次のとおり。
 ./gradlew lintMockDebug detekt jacocoMockDebugUnitTestReport
 ```
 
-前提は JDK 17 と Android SDK（Android Studio を入れていれば揃っている）。MobSF だけは Docker が要る。
+前提は JDK 17 と Android SDK（Android Studio を入れていれば揃っている）。MobSF だけは Podman が要る。
 
 ## 入れたもの
 
@@ -206,7 +206,8 @@ detekt に合わせて戻すための設定。detekt 1.23.7 は Kotlin 2.0.10 �
 ### 何をしているか
 
 MobSF（Mobile Security Framework）は、APK を解析してセキュリティ上の問題を報告する道具。Gradle ではなく、
-Docker で動くサーバに APK を送って使う。`scripts/mobsf-scan.sh` が次の順に REST API を呼ぶ。
+コンテナで動くサーバに APK を送って使う。このリポジトリではコンテナを Podman で動かす。
+`scripts/mobsf-scan.sh` が次の順に REST API を呼ぶ（スクリプトは curl を使うだけで、コンテナの操作はしない）。
 
 1. `api/v1/upload`：APK を送る
 2. `api/v1/scan`：解析する（数分かかる）
@@ -217,13 +218,42 @@ Docker で動くサーバに APK を送って使う。`scripts/mobsf-scan.sh` �
 
 ### 手元で実行
 
-Docker で MobSF を起動する。`MOBSF_API_KEY` は自分で決めた値でよい（スクリプトにも同じ値を渡す）。
+#### 1. Podman を用意する（初回だけ）
+
+[Podman のインストール手順](https://podman.io/docs/installation)に従って入れる。
+
+Mac と Windows では、Podman は Linux の仮想マシンの中でコンテナを動かす。最初に仮想マシンを作っておく。
 
 ```sh
-docker run --rm -d --name mobsf -p 8000:8000 \
-  -e MOBSF_API_KEY=local-mobsf-api-key \
-  opensecurity/mobile-security-framework-mobsf:v4.5.3
+podman machine init
 ```
+
+Mac と Windows は、使う前に毎回（PC を起動したあとなど）仮想マシンを起動する。Linux ではこの手順は要らない。
+
+```sh
+podman machine start
+```
+
+#### 2. MobSF を起動する
+
+`MOBSF_API_KEY` は自分で決めた値でよい（スクリプトにも同じ値を渡す）。外部で登録したり発行してもらったりするものではない。
+
+```sh
+podman run --rm -d --name mobsf -p 8000:8000 \
+  -e MOBSF_API_KEY=local-mobsf-api-key \
+  docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3
+```
+
+イメージ名は `docker.io/` から書く。Podman は短い名前（`opensecurity/...`）だと、どのレジストリから取るかを
+設定（`registries.conf`）で決めるので、環境によっては選択を聞かれたり、取得に失敗したりする。
+
+`-e MOBSF_API_KEY` を付けずに起動した場合は、MobSF が作ったキーが起動ログに出る。
+
+```sh
+podman logs mobsf 2>&1 | grep "REST API Key"
+```
+
+#### 3. APK を解析する
 
 APK を作ってスクリプトに渡す。`jq` と `curl` が要る。
 
@@ -233,11 +263,23 @@ MOBSF_API_KEY=local-mobsf-api-key \
   scripts/mobsf-scan.sh app/build/outputs/apk/product/release/app-product-release-unsigned.apk build/reports/mobsf
 ```
 
-終わったら止める。
+#### 4. 止める
 
 ```sh
-docker stop mobsf
+podman stop mobsf
 ```
+
+`--rm` を付けて起動しているので、止めるとコンテナも消える。解析結果は `build/reports/mobsf/` に保存済み。
+
+#### うまく動かないとき
+
+| 症状 | 確かめること |
+| --- | --- |
+| `Cannot connect to Podman` と出る（Mac / Windows） | `podman machine start` で仮想マシンを起動したか |
+| スクリプトが「起動しませんでした」で止まる | `podman logs mobsf` で MobSF のログを見る。初回はイメージの取得と起動に数分かかるので、`MOBSF_WAIT_SEC=600` で待つ時間を延ばす |
+| `-v` でホストのディレクトリをマウントすると書き込めない | Podman を一般ユーザー（root なし）で動かしているとき、コンテナの中のユーザーに書き込む権限がないことがある。SELinux が有効な Fedora や RHEL では `-v ./mobsf-data:/home/mobsf/.MobSF:Z` のように `:Z` も付ける。上の手順のようにマウントしなければ起きない |
+
+Docker でも、上のコマンドの `podman` を `docker` に置き換えれば同じように動く。
 
 ブラウザで `http://localhost:8000` を開くと、MobSF の画面からも結果を見られる（初期のユーザーとパスワードは `mobsf` / `mobsf`）。
 
@@ -260,8 +302,8 @@ MobSF の結果では CI を止めていない。配布前に `high` の指摘�
 
 ### バージョンを上げる
 
-結果が勝手に変わらないよう、ワークフローとこの文書で Docker イメージのバージョンを固定している（`v4.5.3`）。
-上げるときは、両方の `opensecurity/mobile-security-framework-mobsf:v4.5.3` を書き換え、
+結果が勝手に変わらないよう、ワークフローとこの文書でコンテナイメージのバージョンを固定している（`v4.5.3`）。
+上げるときは、ワークフローの `MOBSF_IMAGE` と、この文書の `docker.io/opensecurity/mobile-security-framework-mobsf:v4.5.3` を書き換え、
 [MobSF のリリースノート](https://github.com/MobSF/Mobile-Security-Framework-MobSF/releases)で API の変更がないか確かめる。
 
 ## CI（GitHub Actions）
@@ -278,8 +320,13 @@ Actions の画面から手で実行することもできる（`workflow_dispatch
 
 成果物は、実行結果の画面の下にある Artifacts からダウンロードできる。失敗したときも出す（`if: always()`）。
 
-MobSF のジョブは、MobSF を同じジョブのサービスコンテナとして起動する。API キーは固定値（`ci-mobsf-api-key`）にしている。
-このコンテナはジョブの中からしか届かず、終われば捨てられるので、秘密にする必要がない。
+MobSF のジョブは、最初の手順で `podman run` を実行して MobSF を起動し、APK を作ってから解析する。
+GitHub Actions の `services:`（ジョブと一緒にコンテナを起動する仕組み）は Docker でしか動かないので使っていない。
+ubuntu-latest のランナーには Podman が入っているので、インストールの手順は要らない。
+失敗したときは MobSF のログをジョブのログに出し、最後に必ずコンテナを止める。
+
+API キーは固定値（`ci-mobsf-api-key`）にしている。このコンテナはジョブの中からしか届かず、
+終われば捨てられるので、秘密にする必要がない。
 
 ## 道具を足す・バージョンを上げるとき
 

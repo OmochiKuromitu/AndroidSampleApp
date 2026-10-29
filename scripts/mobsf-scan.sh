@@ -5,7 +5,7 @@
 #   MOBSF_API_KEY=<API キー> scripts/mobsf-scan.sh <APK のパス> [出力先ディレクトリ]
 #
 # 環境変数:
-#   MOBSF_API_KEY  MobSF の REST API キー（必須）。Docker で起動するときに同じ値を -e MOBSF_API_KEY で渡す
+#   MOBSF_API_KEY  MobSF の REST API キー（必須）。Podman で起動するときに同じ値を -e MOBSF_API_KEY で渡す
 #   MOBSF_URL      MobSF の URL（既定 http://localhost:8000）
 #   MOBSF_WAIT_SEC MobSF が起動するまで待つ秒数（既定 300）
 #
@@ -14,6 +14,7 @@
 #   report.pdf      人が読む用のレポート
 #   scorecard.json  セキュリティスコアと、重要度ごとの指摘
 #
+# このスクリプトは curl で REST API を呼ぶだけで、コンテナの操作はしない。MobSF は先に起動しておく。
 # 詳しくは docs/static-analysis.md の「MobSF」。
 set -euo pipefail
 
