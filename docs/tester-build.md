@@ -7,8 +7,9 @@ GitHub Actions で APK を作り、Google Workspace の共有ドライブに置�
 push（develop）または手で実行
   └▶ APK を作る（既定は product / release。release は Secrets の鍵で署名する）
        ├▶ Actions の成果物に残す（30 日）
-       ├▶ 共有ドライブのフォルダにアップロードする
-       └▶ Slack に知らせる（成功ならドライブのリンク、失敗なら Actions のログへのリンク）
+       ├▶ 共有ドライブのフォルダにアップロードする（リポジトリ変数 DRIVE_FOLDER_ID があるときだけ）
+       └▶ Slack に知らせる（成功ならドライブのリンク、ドライブに置いていなければ Actions の実行結果へのリンク、
+                             失敗なら Actions のログへのリンク）
 ```
 
 ファイル名は `AndroidSampleApp-<flavor>-<ビルドタイプ>-<実行番号>-<コミット>.apk`
@@ -75,6 +76,19 @@ GitHub Actions の仕組み上、push で動くブランチはワークフロー
 | 2. Google Cloud | Google Cloud のプロジェクトの管理者 | サービスアカウントと Workload Identity 連携。GitHub のリポジトリ変数 2 つ |
 | 3. 共有ドライブ | 共有ドライブの管理者 | 置き場所のフォルダ。GitHub のリポジトリ変数 1 つ |
 | 4. Slack | Slack のワークスペースの管理者（またはアプリを作れる人） | Incoming Webhook の URL。GitHub の Secrets 1 つ |
+
+### Google Cloud の準備が済むまで
+
+2 と 3 が済むまでは、リポジトリ変数 `DRIVE_FOLDER_ID` を設定しないでおく。
+その間は「Google Cloud に認証する」と「共有ドライブにアップロードする」の手順を飛ばし（Actions の画面では「スキップ」と出る）、
+APK は Actions の成果物（Artifacts）にだけ置く。Slack には、Actions の実行結果へのリンクを送る。
+
+2 と 3 が済んだら、`GCP_WORKLOAD_IDENTITY_PROVIDER`、`GCP_SERVICE_ACCOUNT`、`DRIVE_FOLDER_ID` の 3 つを設定する。
+ワークフローは触らなくてよく、次の実行からドライブへのアップロードが動き出す。
+`DRIVE_FOLDER_ID` を最後に設定する（先に設定すると、ほかの 2 つが無いまま認証の手順が動いて失敗する）。
+
+Actions の成果物からダウンロードするには、GitHub にログインしていて、このリポジトリを見る権限が要る。
+ダウンロードしたファイルは zip に包まれているので、展開してから端末に入れる。30 日で消える。
 
 ### 1. 署名の鍵
 

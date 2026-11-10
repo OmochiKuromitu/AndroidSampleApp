@@ -95,8 +95,11 @@ jobs:
           path: out/${{ steps.meta.outputs.name }}
           retention-days: 30
 
+      # GCP の準備が済むまで（リポジトリ変数 DRIVE_FOLDER_ID を設定するまで）は、認証とアップロードを飛ばす。
+      # その間 APK は上の Actions の成果物（Artifacts）にだけ置かれる。設定すれば、ここを触らずに自動で動き出す。
       - id: auth
         name: Google Cloud に認証する
+        if: vars.DRIVE_FOLDER_ID != ''
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -106,6 +109,7 @@ jobs:
 
       - id: drive
         name: 共有ドライブにアップロードする
+        if: vars.DRIVE_FOLDER_ID != ''
         env:
           TOKEN: ${{ steps.auth.outputs.access_token }}
           FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
@@ -150,10 +154,16 @@ jobs:
             exit 0
           fi
           if [ "$STATUS" = "success" ]; then
+            if [ -n "$LINK" ]; then
+              where="APK: <${LINK}|${NAME}>"
+            else
+              # ドライブに置いていないときは、Actions の実行結果（下の Artifacts に APK がある）を案内する。
+              where="APK: <${RUN_URL}|Actions の Artifacts>（${NAME}）"
+            fi
             text="テスター向けビルド #${RUN_NUMBER} を置きました
           ブランチ: ${BRANCH}（${SHA}）
           構成: ${FLAVOR} / ${BUILD_TYPE}
-          APK: <${LINK}|${NAME}>"
+          ${where}"
           else
             text="テスター向けビルド #${RUN_NUMBER} が失敗しました（${STATUS}）
           ブランチ: ${BRANCH}（${SHA}）
