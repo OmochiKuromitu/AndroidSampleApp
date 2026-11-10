@@ -36,6 +36,11 @@ push（develop）または手で実行
 
 選べるのは、`tester-build.yml` が入っているブランチだけ。`develop` から切ったブランチなら入っている。
 
+**Run workflow のボタンは、`tester-build.yml` が既定のブランチ（`main`）に入っているときだけ表示される。**
+GitHub Actions の決まりで、手で実行するワークフロー（`workflow_dispatch`）は既定のブランチにファイルが無いと一覧に出ない。
+`main` に入っていれば、ボタンで選んだブランチ側の `tester-build.yml` で実行される。
+develop への push で自動でビルドするほうは、`main` に入っていなくても動く。
+
 ### 既定の構成を変える
 
 push で自動ビルドするときの構成は、リポジトリ変数で変えられる。コードの変更は要らない。
@@ -217,3 +222,13 @@ echo "tester-build-uploader@${PROJECT_ID}.iam.gserviceaccount.com"
 | Slack に知らせる | `invalid_payload` / `no_service` | `SLACK_WEBHOOK_URL` の URL。Webhook を消していないか |
 
 ドライブに置けなかったときも、APK は Actions の実行結果の **Artifacts** に残っている（30 日）。
+
+## ワークフローのファイルを編集するとき
+
+ローカルで編集して push しても、GitHub の画面（ファイルを開いて鉛筆のボタン）で編集してコミットしてもよい。
+
+- GitHub の画面で `develop` に直接コミットすると、それも `develop` への push なので、その場でこのワークフローが動く。
+  動かしたくない変更なら、コミットの画面で新しいブランチを作って Pull Request にする。
+- GitHub の画面で編集したあとは、ローカルで `git pull` してから作業を続ける（そのまま push すると衝突する）。
+- 編集したファイルが使われるのは、そのブランチでの実行から。push で動くときは push したコミットのファイルが、
+  手で実行するときは選んだブランチのファイルが使われる。
