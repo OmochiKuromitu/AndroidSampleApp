@@ -444,6 +444,7 @@ Reducer は Android に依存しない純粋な処理なので、JVM テスト�
 時間に依存するものは `kotlinx-coroutines-test` の `runTest` と仮想時間で書く。
 
 静的解析（Android Lint、detekt、MobSF）とカバレッジ（JaCoCo）は [docs/static-analysis.md](docs/static-analysis.md) にまとめてある。
+テスター向けの APK を作って共有ドライブに置き、Slack に知らせる手順は [docs/tester-build.md](docs/tester-build.md)。
 手元では次の 1 行で、Lint・detekt・単体テストとカバレッジをまとめて実行できる。
 
 ```

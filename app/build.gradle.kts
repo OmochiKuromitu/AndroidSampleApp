@@ -9,6 +9,10 @@ plugins {
     jacoco
 }
 
+// release の署名に使う鍵。CI（tester-build）が環境変数で渡したときだけ署名する（docs/tester-build.md）。
+// 渡されないときは今までどおり署名なしの APK になる（手元のビルドや、static-analysis の MobSF の解析）。
+val releaseStoreFile: String? = providers.environmentVariable("RELEASE_STORE_FILE").orNull
+
 android {
     namespace = "com.example.androidsampleapp"
     compileSdk = 35
@@ -46,12 +50,24 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // 単体テストのカバレッジを JaCoCo で取る。結果は jacocoMockDebugUnitTestReport でまとめる。
             enableUnitTestCoverage = true
         }
         release {
+            if (releaseStoreFile != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
