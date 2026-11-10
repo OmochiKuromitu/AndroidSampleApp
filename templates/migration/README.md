@@ -10,6 +10,11 @@
 3. 移植先の `app/build.gradle.kts` に、release の署名の設定を足す（下）
 4. Secrets と Variables、Google Cloud、共有ドライブ、Slack を準備する（このリポジトリの `docs/tester-build.md` と同じ）
 
+GCP の準備が済むまでは、リポジトリ変数 `DRIVE_FOLDER_ID` を設定しないでおく。その間は認証とドライブへのアップロードを飛ばし、
+APK は Actions の成果物（Artifacts）にだけ置く。Slack には Actions の実行結果へのリンクを送る。
+`DRIVE_FOLDER_ID` を設定すれば、ワークフローを触らずにドライブへのアップロードが動き出す
+（そのときは `GCP_WORKLOAD_IDENTITY_PROVIDER` と `GCP_SERVICE_ACCOUNT` も一緒に設定する）。
+
 ## ビルドバリアントの決まり
 
 flavorDimensions の順（mode → environment）に flavor 名を並べ、最後にビルドタイプを付ける。2 つ目からは頭を大文字にする。
