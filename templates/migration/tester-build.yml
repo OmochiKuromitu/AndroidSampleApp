@@ -59,15 +59,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - id: meta
-        name: タスク名とファイル名を決める
+        name: タスク名とコミットの情報を決める
         run: |
           # mock + Prod + Release → mockProdRelease（2 つ目からは頭を大文字にする）
           variant="${MODE}${ENVIRONMENT^}${BUILD_TYPE^}"
           sha="${GITHUB_SHA::7}"
           echo "variant=${variant}" >> "$GITHUB_OUTPUT"
           echo "task=assemble${variant^}" >> "$GITHUB_OUTPUT"
-          echo "name=App-${variant}-${{ github.run_number }}-${sha}.apk" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          # コミットの日時（日本時間）。ファイル名用（20261111-1430）と、アプリに埋める表示用（2026-11-11 14:30）。
+          echo "date=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "date_display=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:'%Y-%m-%d %H:%M')" >> "$GITHUB_OUTPUT"
 
       # release は署名しないと端末に入れられないので、Secrets の鍵で署名する。
       # debug は Gradle が作る debug 用の鍵で署名されるので要らない。
@@ -84,13 +86,17 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - name: APK を作る
+      - id: apk
+        name: APK を作る
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew "${{ steps.meta.outputs.task }}"
+          # コミット番号と日時をアプリの BuildConfig に埋める（設定画面などで見られるようにするため）。
+          ./gradlew "${{ steps.meta.outputs.task }}" \
+            -PbuildCommit="${{ steps.meta.outputs.sha }}" \
+            -PbuildCommitDate="${{ steps.meta.outputs.date_display }}"
           # 出力先のフォルダ名（apk/mockProd/release）を組み立てずに、作られた APK を探す。
           # ランナーは毎回まっさらなので、ここには今ビルドした 1 つしかない。署名されていない APK（-unsigned）は拾わない。
           apk="$(find app/build/outputs/apk -name '*.apk' ! -name '*-unsigned.apk' | head -n 1)"
@@ -98,14 +104,26 @@ jobs:
             echo "::error::署名済みの APK が見つかりません"
             exit 1
           fi
+          # バージョン番号は APK の中から読む。versionNameSuffix（-mock など）まで含めて、アプリの表示と必ず揃う。
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)aapt2"
+          version="$("$aapt2" dump badging "$apk" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")"
+          if [ -z "$version" ]; then
+            echo "::error::APK からバージョン番号を読めませんでした"
+            exit 1
+          fi
+          # <アプリ>-<ビルドバリアント>-<バージョン>-<コミット>-<コミットの日時>-r<実行番号>.apk
+          # 実行番号は Actions の実行一覧の #12 と同じ。ファイル名に使えない文字は _ にする。
+          name="App-${{ steps.meta.outputs.variant }}-${version//[^A-Za-z0-9._-]/_}-${{ steps.meta.outputs.sha }}-${{ steps.meta.outputs.date }}-r${{ github.run_number }}.apk"
           mkdir -p out
-          cp "$apk" "out/${{ steps.meta.outputs.name }}"
+          cp "$apk" "out/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # ドライブに置けなかったときにも取り出せるよう、Actions の成果物にも残す。
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.name }}
-          path: out/${{ steps.meta.outputs.name }}
+          name: ${{ steps.apk.outputs.name }}
+          path: out/${{ steps.apk.outputs.name }}
           retention-days: 30
 
       # GCP の準備が済むまで（リポジトリ変数 DRIVE_FOLDER_ID を設定するまで）は、認証とアップロードを飛ばす。
@@ -126,7 +144,7 @@ jobs:
         env:
           TOKEN: ${{ steps.auth.outputs.access_token }}
           FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
-          NAME: ${{ steps.meta.outputs.name }}
+          NAME: ${{ steps.apk.outputs.name }}
         run: |
           if [ -z "$FOLDER_ID" ]; then
             echo "::error::リポジトリ変数の DRIVE_FOLDER_ID が未設定です"
@@ -156,8 +174,10 @@ jobs:
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
           STATUS: ${{ job.status }}
           LINK: ${{ steps.drive.outputs.link }}
-          NAME: ${{ steps.meta.outputs.name }}
+          NAME: ${{ steps.apk.outputs.name }}
           SHA: ${{ steps.meta.outputs.sha }}
+          COMMIT_DATE: ${{ steps.meta.outputs.date_display }}
+          VERSION: ${{ steps.apk.outputs.version }}
           VARIANT: ${{ steps.meta.outputs.variant }}
           BRANCH: ${{ github.ref_name }}
           RUN_NUMBER: ${{ github.run_number }}
@@ -175,12 +195,15 @@ jobs:
               where="APK: <${RUN_URL}|Actions の Artifacts>（${NAME}）"
             fi
             text="テスター向けビルド #${RUN_NUMBER} を置きました
-          ブランチ: ${BRANCH}（${SHA}）
+          ブランチ: ${BRANCH}
+          バージョン: ${VERSION}
+          コミット: ${SHA}（${COMMIT_DATE}）
           ビルドバリアント: ${VARIANT}
           ${where}"
           else
             text="テスター向けビルド #${RUN_NUMBER} が失敗しました（${STATUS}）
-          ブランチ: ${BRANCH}（${SHA}）
+          ブランチ: ${BRANCH}
+          コミット: ${SHA}（${COMMIT_DATE}）
           ビルドバリアント: ${VARIANT}
           ログ: <${RUN_URL}|Actions の実行結果>"
           fi
