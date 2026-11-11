@@ -13,6 +13,23 @@ plugins {
 // 渡されないときは今までどおり署名なしの APK になる（手元のビルドや、static-analysis の MobSF の解析）。
 val releaseStoreFile: String? = providers.environmentVariable("RELEASE_STORE_FILE").orNull
 
+// ビルドしたコミットの番号と日時。アプリの BuildConfig に埋め、画面から確かめられるようにする。
+// CI（tester-build）は -PbuildCommit / -PbuildCommitDate で渡す（APK のファイル名と同じ値）。
+// 渡されないとき（手元のビルド）は git から読む。git が使えなければ "unknown"。
+fun gitOutput(vararg args: String): String? = runCatching {
+    providers.exec {
+        commandLine("git", *args)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().ifEmpty { null }
+}.getOrNull()
+
+val buildCommit: String = providers.gradleProperty("buildCommit").orNull
+    ?: gitOutput("rev-parse", "--short=7", "HEAD")
+    ?: "unknown"
+val buildCommitDate: String = providers.gradleProperty("buildCommitDate").orNull
+    ?: gitOutput("log", "-1", "--format=%cd", "--date=format-local:%Y-%m-%d %H:%M")
+    ?: "unknown"
+
 android {
     namespace = "com.example.androidsampleapp"
     compileSdk = 35
@@ -25,6 +42,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // バージョン名（VERSION_NAME）とバージョンコード（VERSION_CODE）は BuildConfig に最初から入る。
+        // コミットの番号と日時は入らないので足す。
+        buildConfigField("String", "BUILD_COMMIT", "\"$buildCommit\"")
+        buildConfigField("String", "BUILD_COMMIT_DATE", "\"$buildCommitDate\"")
     }
 
     // flavor ごとの接続先や挙動は BuildConfig に出し、config/AppConfig が読む。

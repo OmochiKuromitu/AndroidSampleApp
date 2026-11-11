@@ -24,6 +24,8 @@ data class AppConfig(
     val sleepTimeout: Duration,
     /** 状態取得 API を呼ぶ間隔。着信に気づくまでの遅れはこの長さで決まる。 */
     val pollInterval: Duration = DEFAULT_POLL_INTERVAL,
+    /** どのコードからビルドしたか（バージョン、コミット番号、コミットの日時）。 */
+    val buildInfo: BuildInfo = BuildInfo.UNKNOWN,
 ) {
     companion object {
         private val DEFAULT_POLL_INTERVAL = 3_000.milliseconds
@@ -33,6 +35,12 @@ data class AppConfig(
             useFakeApi = BuildConfig.USE_FAKE_API,
             deviceId = BuildConfig.DEVICE_ID,
             sleepTimeout = BuildConfig.SLEEP_TIMEOUT_MS.milliseconds,
+            buildInfo = BuildInfo(
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commit = BuildConfig.BUILD_COMMIT,
+                commitDate = BuildConfig.BUILD_COMMIT_DATE,
+            ),
         )
     }
 }

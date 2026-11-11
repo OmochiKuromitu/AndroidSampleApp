@@ -8,13 +8,39 @@ push（develop）または手で実行
   └▶ APK を作る（既定は product / release。release は Secrets の鍵で署名する）
        ├▶ Actions の成果物に残す（30 日）
        ├▶ 共有ドライブのフォルダにアップロードする（リポジトリ変数 DRIVE_FOLDER_ID があるときだけ）
-       └▶ Slack に知らせる（成功ならドライブのリンク、ドライブに置いていなければ Actions の実行結果へのリンク、
+       └▶ Slack に知らせる（ブランチ、バージョン、コミットと、成功ならドライブのリンク、ドライブに置いていなければ Actions の実行結果へのリンク、
                              失敗なら Actions のログへのリンク）
 ```
 
-ファイル名は `AndroidSampleApp-<flavor>-<ビルドタイプ>-<実行番号>-<コミット>.apk`
-（例: `AndroidSampleApp-product-release-12-a1b2c3d.apk`）。
-実行番号は Actions の実行一覧の `#12` と同じなので、テスターさんから番号を聞けば、どの実行で作ったかがすぐ分かる。
+ファイル名は `AndroidSampleApp-<ビルドバリアント>-<バージョン>-<コミット>-<コミットの日時>-r<実行番号>.apk`。
+
+| 部分 | 例 | 出どころ |
+| --- | --- | --- |
+| ビルドバリアント | `productRelease` | 選んだ flavor とビルドタイプ |
+| バージョン | `1.0` | できた APK の中の versionName（`aapt2` で読む。versionNameSuffix まで含むので、アプリの表示と必ず揃う） |
+| コミット | `a1b2c3d` | ビルドしたコミットの先頭 7 文字 |
+| コミットの日時 | `20261111-1430` | ビルドしたコミットの日時（日本時間） |
+| 実行番号 | `r12` | Actions の実行一覧の `#12` |
+
+例: `AndroidSampleApp-productRelease-1.0-a1b2c3d-20261111-1430-r12.apk`
+
+実行番号が入っているので、同じコミットを何度ビルドしても名前は重ならない。
+テスターさんから番号を聞けば、どの実行で作ったかがすぐ分かる。
+
+### アプリの中で確かめる
+
+バージョン、コミット番号、コミットの日時は、アプリの `BuildConfig` にも埋めてある。ファイル名と同じ値になる。
+
+| 値 | BuildConfig | アプリ側で読むところ |
+| --- | --- | --- |
+| バージョン名 | `VERSION_NAME`（最初から入っている） | `AppConfig.buildInfo.versionName` |
+| バージョンコード | `VERSION_CODE`（最初から入っている） | `AppConfig.buildInfo.versionCode` |
+| コミット番号 | `BUILD_COMMIT`（`app/build.gradle.kts` で足している） | `AppConfig.buildInfo.commit` |
+| コミットの日時 | `BUILD_COMMIT_DATE`（同上） | `AppConfig.buildInfo.commitDate` |
+
+CI は `-PbuildCommit` と `-PbuildCommitDate` で値を渡す。手元のビルドでは、ビルドしたときの git の HEAD から読む
+（コミットの日時はその PC の時刻帯。git が使えなければ `unknown`）。
+画面には `AppConfig.buildInfo.summary`（例: `1.0 (1) / a1b2c3d / 2026-11-11 14:30`）を出せばよい。
 
 ## 使い方
 
