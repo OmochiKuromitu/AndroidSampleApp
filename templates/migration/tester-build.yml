@@ -4,11 +4,8 @@
 #   例: mode = mock、environment = prod、ビルドタイプ = release → mockProdRelease（タスクは assembleMockProdRelease）
 name: tester-build
 
+# 手で実行するときだけ動く（Actions の画面の Run workflow、または gh workflow run）。push では動かない。
 on:
-  push:
-    # 自動でビルドするブランチ。変えるときはここを書き換える。
-    # ほかのブランチは、Actions の画面から手で実行するときに選べる（下の workflow_dispatch）。
-    branches: [develop]
   workflow_dispatch:
     inputs:
       mode:
@@ -29,10 +26,10 @@ on:
         options: [release, debug]
         default: release
 
-# 同じブランチで続けて push されたら、古いほうは止めて新しいほうだけ配る。
+# 同じブランチで続けて実行したときは、先の回を止めずに、終わってから次を動かす。
 concurrency:
   group: tester-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -44,11 +41,10 @@ jobs:
     name: APK を作って配る
     runs-on: ubuntu-latest
     env:
-      # 手で実行したときは画面で選んだ値。push のときは入力が無いので、
-      # リポジトリ変数（Settings > Secrets and variables > Actions > Variables）、それも無ければ既定値。
-      MODE: ${{ inputs.mode || vars.TESTER_BUILD_MODE || 'mock' }}
-      ENVIRONMENT: ${{ inputs.environment || vars.TESTER_BUILD_ENVIRONMENT || 'prod' }}
-      BUILD_TYPE: ${{ inputs.build_type || vars.TESTER_BUILD_TYPE || 'release' }}
+      # Actions の画面で選んだ値。
+      MODE: ${{ inputs.mode }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      BUILD_TYPE: ${{ inputs.build_type }}
     steps:
       - uses: actions/checkout@v4
 

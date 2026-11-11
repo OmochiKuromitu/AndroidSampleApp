@@ -19,6 +19,11 @@ APK は Actions の成果物（Artifacts）にだけ置く。Slack には Action
 `DRIVE_FOLDER_ID` を設定すれば、ワークフローを触らずにドライブへのアップロードが動き出す
 （そのときは `GCP_WORKLOAD_IDENTITY_PROVIDER` と `GCP_SERVICE_ACCOUNT` も一緒に設定する）。
 
+## 動くタイミング
+
+手で実行するときだけ動く（Actions の画面の Run workflow、または `gh workflow run`）。push では動かない。
+Run workflow のボタンは、ワークフローのファイルが移植先の既定のブランチに入っているときだけ表示される。
+
 ## ビルドバリアントの決まり
 
 flavorDimensions の順（mode → environment）に flavor 名を並べ、最後にビルドタイプを付ける。2 つ目からは頭を大文字にする。
@@ -36,8 +41,7 @@ APK を `app` 以外のモジュールで作っているなら、`find app/build
 | 項目 | このリポジトリ版 | 移植先版 |
 | --- | --- | --- |
 | 手で実行するときに選ぶもの | flavor、ビルドタイプ | mode、environment、ビルドタイプ |
-| push のときの既定を決めるリポジトリ変数 | `TESTER_BUILD_FLAVOR` / `TESTER_BUILD_TYPE` | `TESTER_BUILD_MODE` / `TESTER_BUILD_ENVIRONMENT` / `TESTER_BUILD_TYPE` |
-| 既定値（変数が無いとき） | product / release | mock / prod / release |
+| 画面で選ぶときの初期値 | product / release | mock / prod / release |
 | ファイル名 | `AndroidSampleApp-<ビルドバリアント>-<バージョン>-<コミット>-<コミットの日時>-r<実行番号>.apk` | `App-<ビルドバリアント>-<バージョン>-<コミット>-<コミットの日時>-r<実行番号>.apk` |
 | Slack の文面 | 構成: product / release | ビルドバリアント: mockProdRelease |
 

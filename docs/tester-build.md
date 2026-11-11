@@ -4,8 +4,8 @@ GitHub Actions で APK を作り、Google Workspace の共有ドライブに置�
 ワークフローは `.github/workflows/tester-build.yml`。
 
 ```
-push（develop）または手で実行
-  └▶ APK を作る（既定は product / release。release は Secrets の鍵で署名する）
+手で実行（Actions の画面の Run workflow）
+  └▶ APK を作る（選んだ flavor とビルドタイプで。release は Secrets の鍵で署名する）
        ├▶ Actions の成果物に残す（30 日）
        ├▶ 共有ドライブのフォルダにアップロードする（リポジトリ変数 DRIVE_FOLDER_ID があるときだけ）
        └▶ Slack に知らせる（ブランチ、バージョン、コミットと、成功ならドライブのリンク、ドライブに置いていなければ Actions の実行結果へのリンク、
@@ -44,11 +44,6 @@ CI は `-PbuildCommit` と `-PbuildCommitDate` で値を渡す。手元のビル
 
 ## 使い方
 
-### 自動でビルドする
-
-`develop` に push すると動く。ビルドする構成は、リポジトリ変数（下の「既定の構成を変える」）で決めた値で、
-決めていなければ product / release。
-
 ### 手で実行する
 
 1. GitHub のリポジトリで **Actions** → 左の一覧の **tester-build** を開く
@@ -63,34 +58,35 @@ CI は `-PbuildCommit` と `-PbuildCommitDate` で値を渡す。手元のビル
 
 選べるのは、`tester-build.yml` が入っているブランチだけ。`develop` から切ったブランチなら入っている。
 
-**Run workflow のボタンは、`tester-build.yml` が既定のブランチ（`main`）に入っているときだけ表示される。**
+**Run workflow のボタンは、`tester-build.yml` が既定のブランチ（`develop`）に入っているときだけ表示される。**
 GitHub Actions の決まりで、手で実行するワークフロー（`workflow_dispatch`）は既定のブランチにファイルが無いと一覧に出ない。
-`main` に入っていれば、ボタンで選んだブランチ側の `tester-build.yml` で実行される。
-develop への push で自動でビルドするほうは、`main` に入っていなくても動く。
+既定のブランチに入っていれば、ボタンで選んだブランチ側の `tester-build.yml` で実行される。
 
-### 既定の構成を変える
+GitHub CLI からも実行できる。
 
-push で自動ビルドするときの構成は、リポジトリ変数で変えられる。コードの変更は要らない。
+```sh
+gh workflow run tester-build.yml --ref develop -f flavor=product -f build_type=release
+```
 
-**Settings** → **Secrets and variables** → **Actions** → **Variables** タブで、次を足す（または書き換える）。
+### 自動では動かない
 
-| 変数 | 値 | 無いとき |
-| --- | --- | --- |
-| `TESTER_BUILD_FLAVOR` | `product` / `mock` | `product` |
-| `TESTER_BUILD_TYPE` | `release` / `debug` | `release` |
+push では動かない（`on:` は `workflow_dispatch` だけ）。ビルドしたいときに、上の手順で手で実行する。
 
-### 自動でビルドするブランチを変える
+同じブランチで続けて実行したときは、先の回を止めずに、終わってから次を動かす（`concurrency` の `cancel-in-progress: false`）。
+待っている回は 1 つまでで、待っている間にさらに実行すると、待っていた回は取り消されて新しい回が待つ。
 
-`.github/workflows/tester-build.yml` の先頭の `branches` を書き換えてコミットする。複数並べることも、パターンで書くこともできる。
+push でも動かしたくなったら、`.github/workflows/tester-build.yml` の `on:` に次を足す。
 
 ```yaml
 on:
   push:
-    branches: [develop, 'release/**']
+    branches: [develop]
+  workflow_dispatch:
+    # ...今のまま
 ```
 
-GitHub Actions の仕組み上、push で動くブランチはワークフローのファイルに書く必要があり、リポジトリ変数では変えられない。
-一時的にほかのブランチを配りたいだけなら、書き換えずに「手で実行する」でブランチを選べばよい。
+その場合、push のときは画面の入力が無いので、`env` の `FLAVOR` / `BUILD_TYPE` に既定値を書いておく
+（例: `${{ inputs.flavor || 'product' }}`）。
 
 ## 最初の準備
 
@@ -242,8 +238,6 @@ echo "tester-build-uploader@${PROJECT_ID}.iam.gserviceaccount.com"
 | Variable | `GCP_SERVICE_ACCOUNT` | サービスアカウントのメールアドレス | 2 |
 | Variable | `DRIVE_FOLDER_ID` | 置き場所のフォルダ ID | 3 |
 | Secret | `SLACK_WEBHOOK_URL` | Slack の Incoming Webhook の URL | 4 |
-| Variable | `TESTER_BUILD_FLAVOR` | push のときの flavor（任意） | — |
-| Variable | `TESTER_BUILD_TYPE` | push のときのビルドタイプ（任意） | — |
 
 ## うまく動かないとき
 
@@ -267,8 +261,5 @@ echo "tester-build-uploader@${PROJECT_ID}.iam.gserviceaccount.com"
 
 ローカルで編集して push しても、GitHub の画面（ファイルを開いて鉛筆のボタン）で編集してコミットしてもよい。
 
-- GitHub の画面で `develop` に直接コミットすると、それも `develop` への push なので、その場でこのワークフローが動く。
-  動かしたくない変更なら、コミットの画面で新しいブランチを作って Pull Request にする。
 - GitHub の画面で編集したあとは、ローカルで `git pull` してから作業を続ける（そのまま push すると衝突する）。
-- 編集したファイルが使われるのは、そのブランチでの実行から。push で動くときは push したコミットのファイルが、
-  手で実行するときは選んだブランチのファイルが使われる。
+- 編集したファイルが使われるのは、そのブランチでの実行から。手で実行するときに選んだブランチのファイルが使われる。
