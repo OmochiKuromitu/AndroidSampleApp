@@ -10,6 +10,10 @@
 3. 移植先の `app/build.gradle.kts` に、release の署名の設定と、コミットの情報を BuildConfig に埋める設定を足す（下）
 4. Secrets と Variables、Google Cloud、共有ドライブ、Slack を準備する（このリポジトリの `docs/tester-build.md` と同じ）
 
+ワークフローは JDK 21 で Gradle を動かす（`setup-java` の `java-version: 21`）。移植先の AGP と Gradle が JDK 21 に対応している必要がある
+（AGP 8.2 以降、Gradle 8.5 以降）。ローカルも揃えるなら、移植先に `gradle/gradle-daemon-jvm.properties` を置いて `toolchainVersion=21` と書く
+（Gradle 8.8 以降）。
+
 GCP の準備が済むまでは、リポジトリ変数 `DRIVE_FOLDER_ID` を設定しないでおく。その間は認証とドライブへのアップロードを飛ばし、
 APK は Actions の成果物（Artifacts）にだけ置く。Slack には Actions の実行結果へのリンクを送る。
 `DRIVE_FOLDER_ID` を設定すれば、ワークフローを触らずにドライブへのアップロードが動き出す
