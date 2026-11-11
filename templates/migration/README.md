@@ -91,23 +91,63 @@ android {
 }
 ```
 
-設定画面には、たとえば次のように出す（`BuildConfig` はアプリのパッケージのもの）。
+画面からは、`BuildConfig` を直接読まずに `BuildInfo` を通して読む。`BuildInfo` は app モジュールの main
+（`src/main/java`）に 1 つだけ置けばよい。`BuildConfig` がビルドバリアントごとに作り分けられるので、
+同じコードのまま、ビルドした構成の値が入る。flavor ごとのフォルダ（`src/mock/java` など）に書き分ける必要はない。
 
 ```kotlin
-@Composable
-fun BuildInfoText(modifier: Modifier = Modifier) {
-    Text(
-        // 例: 1.0-mock (1) / a1b2c3d / 2026-11-11 14:30
-        text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) / " +
-            "${BuildConfig.BUILD_COMMIT} / ${BuildConfig.BUILD_COMMIT_DATE}",
-        style = MaterialTheme.typography.bodySmall,
-        modifier = modifier,
-    )
+package com.example.yourapp.config   // 置く場所は移植先に合わせる
+
+import com.example.yourapp.BuildConfig   // アプリ（app モジュール）の BuildConfig
+
+/**
+ * このアプリをどのコードからビルドしたか。設定画面に出して、テスターさんの報告と突き合わせる。
+ *
+ * 値は BuildConfig から読む。BuildConfig はビルドバリアントごとに作られるので、
+ * flavor ごとにこのクラスを書き分けなくてよい。
+ */
+data class BuildInfo(
+    val versionName: String,
+    val versionCode: Int,
+    val commit: String,
+    val commitDate: String,
+    /** ビルドバリアント。例: mockProdRelease */
+    val variant: String,
+) {
+    /** 1 行で出すとき。例: 1.0-mock (1) / mockProdRelease / a1b2c3d / 2026-11-11 14:30 */
+    val summary: String
+        get() = "$versionName ($versionCode) / $variant / $commit / $commitDate"
+
+    companion object {
+        /** このビルドの値。 */
+        val current = BuildInfo(
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+            commit = BuildConfig.BUILD_COMMIT,
+            commitDate = BuildConfig.BUILD_COMMIT_DATE,
+            // FLAVOR は dimension の順に並んだ名前（mockProd）。最後にビルドタイプを付ける。
+            variant = BuildConfig.FLAVOR + BuildConfig.BUILD_TYPE.replaceFirstChar { it.uppercase() },
+        )
+    }
 }
 ```
 
-移植先に、BuildConfig を直接読まずに設定のクラスを通す決まりがあるなら、そちらに値を移す
-（このリポジトリでは `config/BuildInfo.kt` と `AppConfig.buildInfo`）。
+設定画面では、`BuildInfo.current.summary` を出すだけ。
+
+```kotlin
+Text(
+    // 例: 1.0-mock (1) / mockProdRelease / a1b2c3d / 2026-11-11 14:30
+    text = BuildInfo.current.summary,
+    style = MaterialTheme.typography.bodySmall,
+)
+```
+
+プレビューやテストでは `BuildInfo.current` を使わず、`BuildInfo(versionName = "1.0-mock", ...)` と値を直接入れて作る。
+ビルドの値に左右されずに表示を確かめられる。
+
+`BuildInfo` は app モジュールに置く。ライブラリのモジュール（`:core` など）にもそのモジュール用の `BuildConfig` は作られるが、
+そちらには `VERSION_NAME` / `VERSION_CODE` が入らず、app の `build.gradle.kts` で足した `BUILD_COMMIT` も見えない。
+別モジュールの画面に出したいときは、app 側で `BuildInfo.current` を作って画面に渡す。
 
 ## release の署名の設定（移植先の app/build.gradle.kts）
 
