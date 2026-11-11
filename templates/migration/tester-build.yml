@@ -46,13 +46,13 @@ jobs:
       ENVIRONMENT: ${{ inputs.environment }}
       BUILD_TYPE: ${{ inputs.build_type }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - id: meta
         name: タスク名とコミットの情報を決める
@@ -197,7 +197,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # ドライブに置けなかったときにも取り出せるよう、Actions の成果物にも残す。
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.apk.outputs.name }}
           path: out/${{ steps.apk.outputs.name }}
