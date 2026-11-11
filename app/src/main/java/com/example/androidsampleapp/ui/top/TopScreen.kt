@@ -3,6 +3,7 @@ package com.example.androidsampleapp.ui.top
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,9 +12,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.androidsampleapp.R
+import com.example.androidsampleapp.config.BuildInfo
 import com.example.androidsampleapp.domain.model.Aircon
 import com.example.androidsampleapp.domain.model.AirconMode
 import com.example.androidsampleapp.domain.model.IncomingCall
@@ -60,7 +63,18 @@ fun TopScreen(
                 message = stringResource(R.string.top_idle),
                 modifier = Modifier.weight(1f),
             )
+        } else {
+            // 着信カードがあるときも、ビルドの情報を画面のいちばん下に置く。
+            Spacer(modifier = Modifier.weight(1f))
         }
+
+        // どのコードからビルドしたか。テスターさんの報告と突き合わせるため、右下に小さく出す。
+        Text(
+            text = stringResource(R.string.top_build_info, state.buildInfo.summary),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.End),
+        )
     }
 }
 
@@ -144,6 +158,7 @@ private fun TopScreenIdlePreview() {
                     targetTemperature = 26.0,
                     roomTemperature = 28.4,
                 ),
+                buildInfo = PREVIEW_BUILD_INFO,
             ),
             onAnswerClick = {},
             onRejectClick = {},
@@ -159,6 +174,7 @@ private fun TopScreenIncomingCallPreview() {
             state = TopState(
                 incomingCall = IncomingCall(roomId = "101", displayName = "玄関"),
                 aircon = Aircon(isOn = false, roomTemperature = 24.1),
+                buildInfo = PREVIEW_BUILD_INFO,
             ),
             onAnswerClick = {},
             onRejectClick = {},
@@ -180,3 +196,10 @@ private fun TopScreenSendingPreview() {
         )
     }
 }
+
+private val PREVIEW_BUILD_INFO = BuildInfo(
+    versionName = "1.0-mock",
+    versionCode = 1,
+    commit = "a1b2c3d",
+    commitDate = "2026-11-11 14:30",
+)

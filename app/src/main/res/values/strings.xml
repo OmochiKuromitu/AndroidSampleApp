@@ -16,6 +16,8 @@
     <string name="top_answered">通話を開始しました</string>
     <string name="top_rejected">着信を拒否しました</string>
     <string name="top_idle">待機中です</string>
+    <!-- トップ画面の右下に出すビルドの情報。例: ビルド 1.0 (1) / a1b2c3d / 2026-11-11 14:30 -->
+    <string name="top_build_info">ビルド %1$s</string>
     <string name="top_aircon_summary">エアコン</string>
     <string name="command_failed">コマンドの送信に失敗しました</string>
 

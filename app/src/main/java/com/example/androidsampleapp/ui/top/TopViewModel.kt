@@ -3,6 +3,7 @@ package com.example.androidsampleapp.ui.top
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.androidsampleapp.R
+import com.example.androidsampleapp.config.AppConfig
 import com.example.androidsampleapp.domain.model.ApiResult
 import com.example.androidsampleapp.domain.model.apiError
 import com.example.androidsampleapp.domain.usecase.AnswerCallUseCase
@@ -32,9 +33,11 @@ class TopViewModel @Inject constructor(
     observeAircon: ObserveAirconStateUseCase,
     private val answerCall: AnswerCallUseCase,
     private val rejectCall: RejectCallUseCase,
+    config: AppConfig,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(TopState())
+    // ビルドの情報は変わらないので、Intent を通さず初期値で入れる（取得を待つ間に空の表示が出ない）。
+    private val _uiState = MutableStateFlow(TopState(buildInfo = config.buildInfo))
     val uiState: StateFlow<TopState> = _uiState.asStateFlow()
 
     private val _effect = Channel<TopEffect>(Channel.BUFFERED)

@@ -15,7 +15,7 @@ Gradle で動く 3 つをまとめて実行するなら次のとおり。
 ./gradlew lintMockDebug detekt jacocoMockDebugUnitTestReport
 ```
 
-前提は JDK 17 と Android SDK（Android Studio を入れていれば揃っている）。MobSF だけは Podman が要る。
+前提は JDK 21 と Android SDK。JDK は `gradle/gradle-daemon-jvm.properties` で 21 を指定してあり、合う JDK が無いと Gradle が止まって知らせる。MobSF だけは Podman が要る。
 
 ## 入れたもの
 

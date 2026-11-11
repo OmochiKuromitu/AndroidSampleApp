@@ -28,6 +28,10 @@ Android Studio でこのディレクトリを開く。実行構成は 4 つ（mo
 
 - compileSdk / targetSdk 35, minSdk 24
 - AGP 8.7.3 / Kotlin 2.0.21 / Gradle 8.11.1 / Hilt 2.52 (KSP)
+- JDK 21 で Gradle を動かす（`gradle/gradle-daemon-jvm.properties`。ローカルも GitHub Actions も同じ）。
+  合う JDK が見つからないと Gradle が止まって知らせるので、JDK 21 を入れておく。
+  Android Studio では Settings → Build, Execution, Deployment → Build Tools → Gradle の Gradle JDK も 21 にする。
+  アプリのバイトコードの target は 17 のまま（`jvmTarget` / `targetCompatibility`）
 - Compose BOM 2024.12.01, Navigation Compose 2.8.5
 - Retrofit 2.11.0 / OkHttp 4.12.0 / kotlinx.serialization
 
