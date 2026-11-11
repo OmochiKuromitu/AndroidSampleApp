@@ -1,0 +1,213 @@
+# テスターさん向けに APK を作り、Google ドライブの共有ドライブに置いて Slack に知らせる。
+#
+# ビルドバリアントは flavorDimensions の順（mode → environment）に flavor 名を並べ、最後にビルドタイプを付けた名前になる。
+#   例: mode = mock、environment = prod、ビルドタイプ = release → mockProdRelease（タスクは assembleMockProdRelease）
+name: tester-build
+
+on:
+  push:
+    # 自動でビルドするブランチ。変えるときはここを書き換える。
+    # ほかのブランチは、Actions の画面から手で実行するときに選べる（下の workflow_dispatch）。
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'mode（flavor）'
+        type: choice
+        # mode の flavor がほかにもあるなら、ここに足す（例: [mock, real]）
+        options: [mock]
+        default: mock
+      environment:
+        description: 'environment（flavor）'
+        type: choice
+        # environment の flavor がほかにもあるなら、ここに足す（例: [prod, stg, dev]）
+        options: [prod]
+        default: prod
+      build_type:
+        description: 'ビルドタイプ'
+        type: choice
+        options: [release, debug]
+        default: release
+
+# 同じブランチで続けて push されたら、古いほうは止めて新しいほうだけ配る。
+concurrency:
+  group: tester-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Google Cloud の Workload Identity 連携で、鍵ファイルを使わずに認証するために要る。
+  id-token: write
+
+jobs:
+  build:
+    name: APK を作って配る
+    runs-on: ubuntu-latest
+    env:
+      # 手で実行したときは画面で選んだ値。push のときは入力が無いので、
+      # リポジトリ変数（Settings > Secrets and variables > Actions > Variables）、それも無ければ既定値。
+      MODE: ${{ inputs.mode || vars.TESTER_BUILD_MODE || 'mock' }}
+      ENVIRONMENT: ${{ inputs.environment || vars.TESTER_BUILD_ENVIRONMENT || 'prod' }}
+      BUILD_TYPE: ${{ inputs.build_type || vars.TESTER_BUILD_TYPE || 'release' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - id: meta
+        name: タスク名とコミットの情報を決める
+        run: |
+          # mock + Prod + Release → mockProdRelease（2 つ目からは頭を大文字にする）
+          variant="${MODE}${ENVIRONMENT^}${BUILD_TYPE^}"
+          sha="${GITHUB_SHA::7}"
+          echo "variant=${variant}" >> "$GITHUB_OUTPUT"
+          echo "task=assemble${variant^}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          # コミットの日時（日本時間）。ファイル名用（20261111-1430）と、アプリに埋める表示用（2026-11-11 14:30）。
+          echo "date=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "date_display=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:'%Y-%m-%d %H:%M')" >> "$GITHUB_OUTPUT"
+
+      # release は署名しないと端末に入れられないので、Secrets の鍵で署名する。
+      # debug は Gradle が作る debug 用の鍵で署名されるので要らない。
+      # Gradle 側では、環境変数 RELEASE_STORE_FILE があるときに release へ signingConfig を付けておく。
+      - name: 署名の鍵を用意する（release のとき）
+        if: env.BUILD_TYPE == 'release'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secrets の RELEASE_KEYSTORE_BASE64 が未設定です"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - id: apk
+        name: APK を作る
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          # コミット番号と日時をアプリの BuildConfig に埋める（設定画面などで見られるようにするため）。
+          ./gradlew "${{ steps.meta.outputs.task }}" \
+            -PbuildCommit="${{ steps.meta.outputs.sha }}" \
+            -PbuildCommitDate="${{ steps.meta.outputs.date_display }}"
+          # 出力先のフォルダ名（apk/mockProd/release）を組み立てずに、作られた APK を探す。
+          # ランナーは毎回まっさらなので、ここには今ビルドした 1 つしかない。署名されていない APK（-unsigned）は拾わない。
+          apk="$(find app/build/outputs/apk -name '*.apk' ! -name '*-unsigned.apk' | head -n 1)"
+          if [ -z "$apk" ]; then
+            echo "::error::署名済みの APK が見つかりません"
+            exit 1
+          fi
+          # バージョン番号は APK の中から読む。versionNameSuffix（-mock など）まで含めて、アプリの表示と必ず揃う。
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)aapt2"
+          version="$("$aapt2" dump badging "$apk" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")"
+          if [ -z "$version" ]; then
+            echo "::error::APK からバージョン番号を読めませんでした"
+            exit 1
+          fi
+          # <アプリ>-<ビルドバリアント>-<バージョン>-<コミット>-<コミットの日時>-r<実行番号>.apk
+          # 実行番号は Actions の実行一覧の #12 と同じ。ファイル名に使えない文字は _ にする。
+          name="App-${{ steps.meta.outputs.variant }}-${version//[^A-Za-z0-9._-]/_}-${{ steps.meta.outputs.sha }}-${{ steps.meta.outputs.date }}-r${{ github.run_number }}.apk"
+          mkdir -p out
+          cp "$apk" "out/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # ドライブに置けなかったときにも取り出せるよう、Actions の成果物にも残す。
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: out/${{ steps.apk.outputs.name }}
+          retention-days: 30
+
+      # GCP の準備が済むまで（リポジトリ変数 DRIVE_FOLDER_ID を設定するまで）は、認証とアップロードを飛ばす。
+      # その間 APK は上の Actions の成果物（Artifacts）にだけ置かれる。設定すれば、ここを触らずに自動で動き出す。
+      - id: auth
+        name: Google Cloud に認証する
+        if: vars.DRIVE_FOLDER_ID != ''
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive
+
+      - id: drive
+        name: 共有ドライブにアップロードする
+        if: vars.DRIVE_FOLDER_ID != ''
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          FOLDER_ID: ${{ vars.DRIVE_FOLDER_ID }}
+          NAME: ${{ steps.apk.outputs.name }}
+        run: |
+          if [ -z "$FOLDER_ID" ]; then
+            echo "::error::リポジトリ変数の DRIVE_FOLDER_ID が未設定です"
+            exit 1
+          fi
+          metadata="$(jq -nc --arg name "$NAME" --arg parent "$FOLDER_ID" '{name: $name, parents: [$parent]}')"
+          # supportsAllDrives=true が無いと、共有ドライブのフォルダが見つからない（404）。
+          res="$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
+            -F "metadata=${metadata};type=application/json;charset=UTF-8" \
+            -F "file=@out/${NAME};type=application/vnd.android.package-archive" \
+            -w '\n%{http_code}' \
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink")"
+          code="$(tail -n 1 <<< "$res")"
+          body="$(sed '$d' <<< "$res")"
+          if [ "$code" != "200" ]; then
+            echo "::error::アップロードに失敗しました（HTTP $code）"
+            echo "$body"
+            exit 1
+          fi
+          link="$(jq -r .webViewLink <<< "$body")"
+          echo "link=$link" >> "$GITHUB_OUTPUT"
+          echo "アップロードしました: $link"
+
+      - name: Slack に知らせる
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          STATUS: ${{ job.status }}
+          LINK: ${{ steps.drive.outputs.link }}
+          NAME: ${{ steps.apk.outputs.name }}
+          SHA: ${{ steps.meta.outputs.sha }}
+          COMMIT_DATE: ${{ steps.meta.outputs.date_display }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          VARIANT: ${{ steps.meta.outputs.variant }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "::notice::Secrets の SLACK_WEBHOOK_URL が未設定なので、Slack には知らせません"
+            exit 0
+          fi
+          if [ "$STATUS" = "success" ]; then
+            if [ -n "$LINK" ]; then
+              where="APK: <${LINK}|${NAME}>"
+            else
+              # ドライブに置いていないときは、Actions の実行結果（下の Artifacts に APK がある）を案内する。
+              where="APK: <${RUN_URL}|Actions の Artifacts>（${NAME}）"
+            fi
+            text="テスター向けビルド #${RUN_NUMBER} を置きました
+          ブランチ: ${BRANCH}
+          バージョン: ${VERSION}
+          コミット: ${SHA}（${COMMIT_DATE}）
+          ビルドバリアント: ${VARIANT}
+          ${where}"
+          else
+            text="テスター向けビルド #${RUN_NUMBER} が失敗しました（${STATUS}）
+          ブランチ: ${BRANCH}
+          コミット: ${SHA}（${COMMIT_DATE}）
+          ビルドバリアント: ${VARIANT}
+          ログ: <${RUN_URL}|Actions の実行結果>"
+          fi
+          # YAML の字下げで行頭に入る空白を取る。
+          text="$(sed 's/^ *//' <<< "$text")"
+          curl -fsS -X POST -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg text "$text" '{text: $text}')" "$WEBHOOK"
