@@ -82,6 +82,87 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
+      # ビルドの前に、鍵ストアのパスワード・alias・鍵のパスワードで鍵を開けるかを確かめる。
+      # 署名はビルドの最後なので、ここで確かめないと、数分ビルドしてから失敗する。
+      # Android のビルドと同じく Java の KeyStore で読む（keytool は PKCS12 の鍵のパスワードを無視するので、見逃す）。
+      - name: 署名の鍵を確かめる（release のとき）
+        if: env.BUILD_TYPE == 'release'
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          cat > "$RUNNER_TEMP/CheckSigningKey.java" <<'JAVA'
+          import java.io.File;
+          import java.io.IOException;
+          import java.security.KeyStore;
+          import java.security.UnrecoverableKeyException;
+          import java.util.Collections;
+
+          // 署名の鍵が、Secrets のパスワードと alias で開けるかを確かめる。Android のビルドが署名のときにするのと同じ読み方をする。
+          // 値は環境変数で受け取る（コマンドの引数にするとログに残るため）。
+          public class CheckSigningKey {
+              public static void main(String[] args) throws Exception {
+                  String path = System.getenv("RELEASE_STORE_FILE");
+                  String storePass = System.getenv("RELEASE_STORE_PASSWORD");
+                  String alias = System.getenv("RELEASE_KEY_ALIAS");
+                  String keyPass = System.getenv("RELEASE_KEY_PASSWORD");
+
+                  if (isEmpty(storePass) || isEmpty(alias) || isEmpty(keyPass)) {
+                      error("Secrets の RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD のどれかが未設定です");
+                      return;
+                  }
+                  warnIfPadded("RELEASE_STORE_PASSWORD", storePass);
+                  warnIfPadded("RELEASE_KEY_ALIAS", alias);
+                  warnIfPadded("RELEASE_KEY_PASSWORD", keyPass);
+
+                  KeyStore store;
+                  try {
+                      store = KeyStore.getInstance(new File(path), storePass.toCharArray());
+                  } catch (IOException e) {
+                      error("鍵ストアを開けません。RELEASE_STORE_PASSWORD が違うか、RELEASE_KEYSTORE_BASE64 の中身が壊れています（" + e.getMessage() + "）");
+                      return;
+                  }
+                  System.out.println("鍵ストアの形式: " + store.getType());
+
+                  if (!store.containsAlias(alias)) {
+                      error("alias が見つかりません。RELEASE_KEY_ALIAS を確かめてください。"
+                          + "鍵ストアにある alias: " + Collections.list(store.aliases()));
+                      return;
+                  }
+                  try {
+                      if (store.getKey(alias, keyPass.toCharArray()) == null) {
+                          error("その alias は秘密鍵ではありません。署名に使う鍵の alias を RELEASE_KEY_ALIAS に入れてください");
+                          return;
+                      }
+                  } catch (UnrecoverableKeyException e) {
+                      String hint = "PKCS12".equalsIgnoreCase(store.getType())
+                          ? "PKCS12 の鍵ストアでは、鍵のパスワードは鍵ストアのパスワードと同じです。RELEASE_STORE_PASSWORD と同じ値を入れてください。"
+                          : "";
+                      error("鍵のパスワード（RELEASE_KEY_PASSWORD）が違います。" + hint);
+                      return;
+                  }
+                  System.out.println("署名の鍵を開けることを確かめました");
+              }
+
+              private static boolean isEmpty(String value) {
+                  return value == null || value.isEmpty();
+              }
+
+              private static void warnIfPadded(String name, String value) {
+                  if (!value.equals(value.strip())) {
+                      System.out.println("::warning::" + name + " の前後に空白か改行が入っています。貼り付けるときに入った可能性があります");
+                  }
+              }
+
+              private static void error(String message) {
+                  System.out.println("::error::" + message);
+                  System.exit(1);
+              }
+          }
+          JAVA
+          java -Dstdout.encoding=UTF-8 "$RUNNER_TEMP/CheckSigningKey.java"
+
       - id: apk
         name: APK を作る
         env:

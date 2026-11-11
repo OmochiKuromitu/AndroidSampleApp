@@ -135,11 +135,14 @@ GitHub の **Settings** → **Secrets and variables** → **Actions** → **Secr
 | `RELEASE_KEYSTORE_BASE64` | `tester-release.jks.base64` の中身 |
 | `RELEASE_STORE_PASSWORD` | 鍵ストアのパスワード |
 | `RELEASE_KEY_ALIAS` | `keytool` の `-alias` に指定した名前（上の例では `tester`） |
-| `RELEASE_KEY_PASSWORD` | 鍵のパスワード（聞かれなかったときは鍵ストアと同じ） |
+| `RELEASE_KEY_PASSWORD` | 鍵のパスワード。PKCS12 の鍵ストア（JDK 9 以降の `keytool` の既定）では、鍵ストアのパスワードと同じ値 |
 
 **鍵ファイル（`tester-release.jks`）とパスワードは、リポジトリの外の安全な場所に保管する。**
 なくすと同じ鍵で署名できなくなり、テスターさんは入っているアプリを消してから入れ直すことになる。
 鍵ファイルはリポジトリにコミットしない（`.gitignore` で `*.jks` を外してある）。
+
+ワークフローは、ビルドを始める前に「署名の鍵を確かめる」の手順で、Secrets のパスワードと alias で鍵を開けるかを確かめる。
+間違っていれば、ビルドの前に数秒で止まり、どの値が違うかを知らせる（下の「うまく動かないとき」）。
 
 Gradle は、環境変数 `RELEASE_STORE_FILE` があるときだけこの鍵で署名する（`app/build.gradle.kts` の `signingConfigs`）。
 手元のビルドや static-analysis の MobSF のジョブでは渡さないので、今までどおり署名なしの APK になる。
@@ -246,8 +249,11 @@ echo "tester-build-uploader@${PROJECT_ID}.iam.gserviceaccount.com"
 | 止まった手順 | 出ているもの | 確かめること |
 | --- | --- | --- |
 | 署名の鍵を用意する | `RELEASE_KEYSTORE_BASE64 が未設定` | Secrets の名前の綴り。base64 にした中身を全部貼ったか |
-| APK を作る | `Keystore was tampered with, or password was incorrect` | `RELEASE_STORE_PASSWORD` |
-| APK を作る | `Cannot recover key` | `RELEASE_KEY_ALIAS` と `RELEASE_KEY_PASSWORD` |
+| 署名の鍵を確かめる | `鍵ストアを開けません` | `RELEASE_STORE_PASSWORD`。または `RELEASE_KEYSTORE_BASE64` の中身が壊れている（Windows の `certutil -encode` で作ると見出し行が付いて壊れる） |
+| 署名の鍵を確かめる | `alias が見つかりません` | `RELEASE_KEY_ALIAS`。メッセージに鍵ストアにある alias が出る |
+| 署名の鍵を確かめる | `鍵のパスワード（RELEASE_KEY_PASSWORD）が違います` | PKCS12 の鍵ストアなら `RELEASE_STORE_PASSWORD` と同じ値にする。`keytool` は PKCS12 で別の鍵のパスワードを指定されても無視するので、作ったときに入れたつもりの値とは違う |
+| 署名の鍵を確かめる | `前後に空白か改行が入っています`（警告） | Secrets を貼るときに空白や改行が一緒に入った。入れ直す |
+| APK を作る | `Failed to read key ... from store` | 「署名の鍵を確かめる」が通っているなら、移植先の `build.gradle.kts` で読んでいる環境変数の名前が、ワークフローと揃っているか |
 | Google Cloud に認証する | `the given credential is rejected by the attribute condition` | プロバイダの `attribute-condition` のリポジトリ名（大文字・小文字も） |
 | Google Cloud に認証する | `Permission 'iam.serviceAccounts.getAccessToken' denied` | `roles/iam.workloadIdentityUser` を付けたか。`principalSet` のリポジトリ名 |
 | 共有ドライブにアップロードする | `HTTP 404`（`File not found`） | サービスアカウントを共有ドライブのメンバーに追加したか。`DRIVE_FOLDER_ID` |
