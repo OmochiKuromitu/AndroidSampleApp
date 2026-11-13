@@ -57,7 +57,7 @@ jobs:
           echo "variant=${FLAVOR}${BUILD_TYPE^}" >> "$GITHUB_OUTPUT"
           echo "task=assemble${FLAVOR^}${BUILD_TYPE^}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
-          # コミットの日時（日本時間）。ファイル名用（20261111-1430）と、Slack に出す表示用（2026-11-11 14:30）。
+          # コミットの日時（日本時間）。ファイル名用（20261111-1430）と、アプリに埋める表示用（2026-11-11 14:30）。
           echo "date=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
           echo "date_display=$(TZ=Asia/Tokyo git log -1 --format=%cd --date=format-local:'%Y-%m-%d %H:%M')" >> "$GITHUB_OUTPUT"
 
@@ -82,7 +82,10 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew "${{ steps.meta.outputs.task }}"
+          # コミット番号と日時をアプリの BuildConfig に埋める（設定画面などで見られるようにするため）。
+          ./gradlew "${{ steps.meta.outputs.task }}" \
+            -PbuildCommit="${{ steps.meta.outputs.sha }}" \
+            -PbuildCommitDate="${{ steps.meta.outputs.date_display }}"
           # 署名されていない APK（-unsigned）は入れられないので拾わない。
           apk="$(find "app/build/outputs/apk/$FLAVOR/$BUILD_TYPE" -name '*.apk' ! -name '*-unsigned.apk' | head -n 1)"
           if [ -z "$apk" ]; then
