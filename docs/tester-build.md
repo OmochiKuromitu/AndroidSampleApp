@@ -29,18 +29,11 @@ push（develop）または手で実行
 
 ### アプリの中で確かめる
 
-バージョン、コミット番号、コミットの日時は、アプリの `BuildConfig` にも埋めてある。ファイル名と同じ値になる。
+アプリのトップ画面の右下に、バージョン名とバージョンコードを出している（例: `1.0 (1)`）。
+値は `BuildConfig` に最初から入っている `VERSION_NAME` / `VERSION_CODE` で、`AppConfig.buildInfo` から読む。
 
-| 値 | BuildConfig | アプリ側で読むところ |
-| --- | --- | --- |
-| バージョン名 | `VERSION_NAME`（最初から入っている） | `AppConfig.buildInfo.versionName` |
-| バージョンコード | `VERSION_CODE`（最初から入っている） | `AppConfig.buildInfo.versionCode` |
-| コミット番号 | `BUILD_COMMIT`（`app/build.gradle.kts` で足している） | `AppConfig.buildInfo.commit` |
-| コミットの日時 | `BUILD_COMMIT_DATE`（同上） | `AppConfig.buildInfo.commitDate` |
-
-CI は `-PbuildCommit` と `-PbuildCommitDate` で値を渡す。手元のビルドでは、ビルドしたときの git の HEAD から読む
-（コミットの日時はその PC の時刻帯。git が使えなければ `unknown`）。
-画面には `AppConfig.buildInfo.summary`（例: `1.0 (1) / a1b2c3d / 2026-11-11 14:30`）を出せばよい。
+コミット番号とコミットの日時はアプリに埋めていない。ビルドのたびに値が変わると Gradle のキャッシュが効かなくなり、
+手元のビルドで毎回 git を呼ぶのも時間がかかるため。どのコミットから作ったかは、APK のファイル名か Slack の通知で確かめる。
 
 ## 使い方
 

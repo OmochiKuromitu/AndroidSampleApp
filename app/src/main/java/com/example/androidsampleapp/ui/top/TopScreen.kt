@@ -200,6 +200,4 @@ private fun TopScreenSendingPreview() {
 private val PREVIEW_BUILD_INFO = BuildInfo(
     versionName = "1.0-mock",
     versionCode = 1,
-    commit = "a1b2c3d",
-    commitDate = "2026-11-11 14:30",
 )

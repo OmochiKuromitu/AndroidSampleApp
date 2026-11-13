@@ -1,27 +1,23 @@
 package com.example.androidsampleapp.config
 
 /**
- * このアプリをどのコードからビルドしたか。設定画面などに出して、テスターさんの報告と突き合わせるのに使う。
+ * このアプリのバージョン。画面に出して、テスターさんの報告と突き合わせるのに使う。
  *
- * 値は app/build.gradle.kts が BuildConfig に埋める。CI（tester-build）のビルドなら、APK のファイル名と同じ値になる。
- * 手元のビルドでは、ビルドしたときの git の HEAD から読む（読めなければ "unknown"）。
+ * 値は BuildConfig に最初から入っている VERSION_NAME / VERSION_CODE。
+ * コミット番号と日時はアプリに埋めない（毎回 git を呼ぶとビルドが遅くなるため）。APK のファイル名で確かめる。
  */
 data class BuildInfo(
     /** バージョン名。versionNameSuffix（-mock など）まで含む。例: 1.0-mock */
     val versionName: String,
     /** バージョンコード。 */
     val versionCode: Int,
-    /** コミット番号（先頭 7 文字）。例: a1b2c3d */
-    val commit: String,
-    /** コミットの日時。CI のビルドは日本時間。例: 2026-11-11 14:30 */
-    val commitDate: String,
 ) {
-    /** 1 行で出すとき。例: 1.0-mock (1) / a1b2c3d / 2026-11-11 14:30 */
+    /** 1 行で出すとき。例: 1.0-mock (1) */
     val summary: String
-        get() = "$versionName ($versionCode) / $commit / $commitDate"
+        get() = "$versionName ($versionCode)"
 
     companion object {
         /** テストなど、BuildConfig を読まないときの値。 */
-        val UNKNOWN = BuildInfo(versionName = "unknown", versionCode = 0, commit = "unknown", commitDate = "unknown")
+        val UNKNOWN = BuildInfo(versionName = "unknown", versionCode = 0)
     }
 }
