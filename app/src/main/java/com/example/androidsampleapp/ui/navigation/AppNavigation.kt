@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.androidsampleapp.ui.aircon.AirconRoute
 import com.example.androidsampleapp.ui.common.Route
 import com.example.androidsampleapp.ui.contact.ContactRoute
+import com.example.androidsampleapp.ui.groupcall.GroupCallRoute
 import com.example.androidsampleapp.ui.main.MainRoute
 import com.example.androidsampleapp.ui.main.MainTab
 import com.example.androidsampleapp.ui.main.toRoute
@@ -113,7 +114,13 @@ fun AppNavigation(
                     onTabClick = onTabClick,
                     snackbarHostState = snackbarHostState,
                 ) {
-                    TopRoute(snackbarHostState = snackbarHostState)
+                    TopRoute(
+                        snackbarHostState = snackbarHostState,
+                        // 仮の入口。通話の流れができたら、応答したときなどに開く形に置き換える。
+                        onGroupCallRequested = {
+                            navController.navigate(Route.GROUP_CALL) { launchSingleTop = true }
+                        },
+                    )
                 }
             }
 
@@ -149,6 +156,13 @@ fun AppNavigation(
                         },
                     )
                 }
+            }
+
+            composable(Route.GROUP_CALL) {
+                GroupCallRoute(
+                    // 通話を終えたら、開く前の画面に戻る。
+                    onCallEnded = { navController.popBackStack() },
+                )
             }
 
             composable(Route.SLEEP) {

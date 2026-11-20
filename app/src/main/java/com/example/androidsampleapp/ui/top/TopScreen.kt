@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ fun TopScreen(
     state: TopState,
     onAnswerClick: () -> Unit,
     onRejectClick: () -> Unit,
+    onGroupCallClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -57,6 +59,11 @@ fun TopScreen(
         }
 
         AirconSummaryCard(aircon = state.aircon)
+
+        // グループ通話の画面を開く仮のボタン。通話の流れができたら消す。
+        OutlinedButton(onClick = onGroupCallClick, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.top_group_call_temporary))
+        }
 
         if (call == null) {
             CenteredMessage(
@@ -162,6 +169,7 @@ private fun TopScreenIdlePreview() {
             ),
             onAnswerClick = {},
             onRejectClick = {},
+            onGroupCallClick = {},
         )
     }
 }
@@ -178,6 +186,7 @@ private fun TopScreenIncomingCallPreview() {
             ),
             onAnswerClick = {},
             onRejectClick = {},
+            onGroupCallClick = {},
         )
     }
 }
@@ -193,6 +202,7 @@ private fun TopScreenSendingPreview() {
             ),
             onAnswerClick = {},
             onRejectClick = {},
+            onGroupCallClick = {},
         )
     }
 }

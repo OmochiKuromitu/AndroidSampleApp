@@ -26,6 +26,9 @@ sealed interface TopIntent : UiIntent {
     /** 着信カードの拒否ボタンを押した。 */
     data object RejectClicked : TopIntent
 
+    /** グループ通話の画面を開く仮のボタンを押した。通話の流れができたら消す。 */
+    data object GroupCallClicked : TopIntent
+
     // ---- コマンド送信の結果（ViewModel が送信後に投げる）
 
     /** 応答・拒否のコマンドを送り終えた。 */

@@ -4,6 +4,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -19,11 +20,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun TopRoute(
     snackbarHostState: SnackbarHostState,
+    onGroupCallRequested: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TopViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // LaunchedEffect の中身は最初に起動したときのまま動き続けるので、常に最新のコールバックを呼ぶ。
+    val currentOnGroupCallRequested by rememberUpdatedState(onGroupCallRequested)
 
     // Effect は一回きりの出来事なので State とは別に受け取り、届いた順に 1 つずつ処理する。
     // 画面が裏に回っている間も受け取る（前面に戻るまで溜めることはしない）。
@@ -32,6 +36,7 @@ fun TopRoute(
             when (effect) {
                 is TopEffect.ShowMessage ->
                     snackbarHostState.showSnackbar(effect.text ?: context.getString(effect.messageRes))
+                TopEffect.GroupCallRequested -> currentOnGroupCallRequested()
             }
         }
     }
@@ -40,6 +45,7 @@ fun TopRoute(
         state = state,
         onAnswerClick = { viewModel.onIntent(TopIntent.AnswerClicked) },
         onRejectClick = { viewModel.onIntent(TopIntent.RejectClicked) },
+        onGroupCallClick = { viewModel.onIntent(TopIntent.GroupCallClicked) },
         modifier = modifier,
     )
 }

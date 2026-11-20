@@ -83,6 +83,8 @@ class TopViewModel @Inject constructor(
                 successMessage = R.string.top_rejected,
             ) { rejectCall(it) }
 
+            TopIntent.GroupCallClicked -> _effect.send(TopEffect.GroupCallRequested)
+
             is TopIntent.IncomingCallChanged,
             is TopIntent.AirconChanged,
             TopIntent.CommandSucceeded,

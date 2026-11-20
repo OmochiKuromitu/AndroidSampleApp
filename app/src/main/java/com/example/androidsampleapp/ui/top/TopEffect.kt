@@ -13,4 +13,7 @@ sealed interface TopEffect : UiEffect {
      * 文言は画面側で解決する。ViewModel が Context を持たずに済む。
      */
     data class ShowMessage(@StringRes val messageRes: Int, val text: String? = null) : TopEffect
+
+    /** グループ通話の画面を開きたい（仮のボタンが押された）。どこへ行くかは AppNavigation が決める。 */
+    data object GroupCallRequested : TopEffect
 }

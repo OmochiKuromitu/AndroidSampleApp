@@ -64,4 +64,14 @@
     <string name="api_error_network">通信できませんでした。接続を確認してください</string>
     <string name="api_error_unknown">予期しないエラーが発生しました</string>
 
+    <!-- グループ通話 -->
+    <string name="group_call_title">グループ通話中</string>
+    <string name="group_call_member_count">%1$d名</string>
+    <string name="group_call_mic_volume">マイク音量</string>
+    <string name="group_call_speaker">スピーカー</string>
+    <string name="group_call_mute">ミュート</string>
+    <string name="group_call_end">通話終了</string>
+    <!-- トップ画面からグループ通話の画面を開く仮のボタン。通話の流れができたら消す -->
+    <string name="top_group_call_temporary">グループ通話（仮）</string>
+
 </resources>

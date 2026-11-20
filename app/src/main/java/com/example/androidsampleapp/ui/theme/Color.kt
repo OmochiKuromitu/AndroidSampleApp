@@ -18,6 +18,9 @@ val TagAircon = Color(0xFF2E8B77)
 val TagAlert = Color(0xFFC0453C)
 val TagInfo = Color(0xFF6B7280)
 
+// 通話中のラベル。白文字が乗る前提の緑。
+val CallActiveGreen = Color(0xFF4FAE2E)
+
 // 通知のカード。スリープ画面の黒い背景に置くので、テーマに関係なく白地に濃い文字で描く。
 val NoticeCardBackground = Color.White
 val NoticeCardContent = Grey900

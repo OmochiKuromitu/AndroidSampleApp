@@ -19,5 +19,8 @@ class TopReducer : Reducer<TopState, TopIntent> {
         TopIntent.CommandSucceeded,
         TopIntent.CommandFailed,
         -> state.copy(isSendingCommand = false)
+
+        // 遷移は状態変化ではないので Effect で扱う。
+        TopIntent.GroupCallClicked -> state
     }
 }

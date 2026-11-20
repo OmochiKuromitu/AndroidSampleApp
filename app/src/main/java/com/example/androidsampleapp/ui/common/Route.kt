@@ -12,6 +12,9 @@ object Route {
     /** スリープ画面。下部バーを出さないので、タブの枠には入れない。 */
     const val SLEEP = "sleep"
 
+    /** グループ通話の画面。通話中は下部バーを出さないので、タブの枠には入れない。 */
+    const val GROUP_CALL = "groupCall"
+
     /** 連絡先で最初に開くリストを渡す引数の名前。 */
     const val ARG_CONTACT_LIST = "list"
 

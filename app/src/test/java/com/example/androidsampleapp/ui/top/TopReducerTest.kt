@@ -42,4 +42,14 @@ class TopReducerTest {
 
         assertNull(next.incomingCall)
     }
+
+    @Test
+    fun `グループ通話の仮のボタンは状態を変えない`() {
+        // 画面を開くのは Effect を受けた AppNavigation。
+        val state = TopState(incomingCall = IncomingCall("101", "玄関"))
+
+        val next = reducer.reduce(state, TopIntent.GroupCallClicked)
+
+        assertEquals(state, next)
+    }
 }
