@@ -119,12 +119,14 @@ jobs:
       - name: APK を作る
         run: ./gradlew assembleProductRelease
 
+      # MobSF は起動のたびに JADX を GitHub から取ってくるので、回線しだいで起動に数分かかる。待ち時間は scripts/mobsf-scan.sh の既定（900 秒）。
       - name: MobSF で解析
         run: scripts/mobsf-scan.sh app/build/outputs/apk/product/release/app-product-release-unsigned.apk build/reports/mobsf
 
       - name: MobSF のログ（失敗したとき）
         if: failure()
-        run: podman logs mobsf || true
+        # 時刻を付けて出す。起動のどの段階（JADX の取得、初期化、Web サーバの起動）で止まったかを追えるようにする。
+        run: podman logs --timestamps mobsf || true
 
       - name: MobSF を止める
         if: always()

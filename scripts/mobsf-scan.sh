@@ -7,7 +7,8 @@
 # 環境変数:
 #   MOBSF_API_KEY  MobSF の REST API キー（必須）。Podman で起動するときに同じ値を -e MOBSF_API_KEY で渡す
 #   MOBSF_URL      MobSF の URL（既定 http://localhost:8000）
-#   MOBSF_WAIT_SEC MobSF が起動するまで待つ秒数（既定 300）
+#   MOBSF_WAIT_SEC MobSF が起動するまで待つ秒数（既定 900）。
+#                  MobSF は起動のたびに解析の道具（JADX）を GitHub から取ってくるので、回線しだいで数分かかる
 #
 # 出力:
 #   report.json     解析結果のすべて
@@ -22,20 +23,27 @@ apk="${1:?APK のパスを指定してください（例: app/build/outputs/apk/
 out="${2:-build/reports/mobsf}"
 url="${MOBSF_URL:-http://localhost:8000}"
 key="${MOBSF_API_KEY:?MOBSF_API_KEY を設定してください}"
-wait_sec="${MOBSF_WAIT_SEC:-300}"
+wait_sec="${MOBSF_WAIT_SEC:-900}"
 
 [[ -f "$apk" ]] || { echo "APK が見つかりません: $apk" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq が必要です" >&2; exit 1; }
 mkdir -p "$out"
 
 # 起動直後は応答しないので、トップページが返るまで待つ。
-echo "MobSF の起動を待っています: $url"
+# 1 分ごとに経過時間と応答を出す（000 はまだ接続できない状態）。止まったときに、どこまで進んでいたかを追えるようにする。
+echo "MobSF の起動を待っています: $url（最大 ${wait_sec} 秒）"
+code="000"
 for ((i = 0; i < wait_sec; i += 5)); do
   code="$(curl -s -o /dev/null -w '%{http_code}' "$url/" || true)"
   [[ "$code" == "200" || "$code" == "302" ]] && break
+  (( i > 0 && i % 60 == 0 )) && echo "  ${i} 秒経過（応答: ${code}）"
   sleep 5
 done
-[[ "$code" == "200" || "$code" == "302" ]] || { echo "MobSF が ${wait_sec} 秒以内に起動しませんでした" >&2; exit 1; }
+[[ "$code" == "200" || "$code" == "302" ]] || {
+  echo "MobSF が ${wait_sec} 秒以内に起動しませんでした（最後の応答: ${code}）" >&2
+  exit 1
+}
+echo "MobSF が起動しました（${i} 秒）"
 
 api() {
   # $1: API のパス、残り: curl に渡す引数

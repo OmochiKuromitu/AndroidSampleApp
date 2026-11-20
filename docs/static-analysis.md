@@ -276,7 +276,7 @@ podman stop mobsf
 | 症状 | 確かめること |
 | --- | --- |
 | `Cannot connect to Podman` と出る（Mac / Windows） | `podman machine start` で仮想マシンを起動したか |
-| スクリプトが「起動しませんでした」で止まる | `podman logs mobsf` で MobSF のログを見る。初回はイメージの取得と起動に数分かかるので、`MOBSF_WAIT_SEC=600` で待つ時間を延ばす |
+| スクリプトが「起動しませんでした」で止まる | `podman logs --timestamps mobsf` で MobSF のログを見る。MobSF は起動のたびに解析の道具（JADX）を GitHub から取ってくるので、回線しだいで起動に数分かかる。待ち時間の既定は 900 秒で、`MOBSF_WAIT_SEC` で延ばせる |
 | `-v` でホストのディレクトリをマウントすると書き込めない | Podman を一般ユーザー（root なし）で動かしているとき、コンテナの中のユーザーに書き込む権限がないことがある。SELinux が有効な Fedora や RHEL では `-v ./mobsf-data:/home/mobsf/.MobSF:Z` のように `:Z` も付ける。上の手順のようにマウントしなければ起きない |
 
 Docker でも、上のコマンドの `podman` を `docker` に置き換えれば同じように動く。
