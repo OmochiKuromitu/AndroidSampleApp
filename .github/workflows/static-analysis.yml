@@ -104,10 +104,13 @@ jobs:
 
       # ubuntu-latest のランナーには Podman が入っている。services: は Docker でしか動かないので、ここで起動する。
       # APK を作っている間に起動が進むよう、先に立ち上げておく。
+      # --network host にして、ランナーの localhost:8000 でそのまま受ける。
+      # Podman 5 は一般ユーザーで動かすときのポート転送（-p）が pasta に変わり、
+      # このランナーではホストから -p 8000:8000 の先に届かなかった（MobSF は起動しているのに接続できない）。
       - name: MobSF を起動（Podman）
         run: |
           podman --version
-          podman run --rm -d --name mobsf -p 8000:8000 -e MOBSF_API_KEY="$MOBSF_API_KEY" "$MOBSF_IMAGE"
+          podman run --rm -d --name mobsf --network host -e MOBSF_API_KEY="$MOBSF_API_KEY" "$MOBSF_IMAGE"
 
       - uses: actions/setup-java@v4
         with:
@@ -119,14 +122,17 @@ jobs:
       - name: APK を作る
         run: ./gradlew assembleProductRelease
 
-      # MobSF は起動のたびに JADX を GitHub から取ってくるので、回線しだいで起動に数分かかる。待ち時間は scripts/mobsf-scan.sh の既定（900 秒）。
       - name: MobSF で解析
         run: scripts/mobsf-scan.sh app/build/outputs/apk/product/release/app-product-release-unsigned.apk build/reports/mobsf
 
       - name: MobSF のログ（失敗したとき）
         if: failure()
-        # 時刻を付けて出す。起動のどの段階（JADX の取得、初期化、Web サーバの起動）で止まったかを追えるようにする。
-        run: podman logs --timestamps mobsf || true
+        # 時刻を付けて出す。MobSF の中で Web サーバが起動した時刻（Listening at）と、スクリプトが諦めた時刻を比べられるようにする。
+        # 起動しているのに届かないときのために、ランナーから接続した結果もそのまま出す。
+        run: |
+          podman logs --timestamps mobsf || true
+          podman ps -a --filter name=mobsf || true
+          curl -sv -o /dev/null "$MOBSF_URL/" || true
 
       - name: MobSF を止める
         if: always()

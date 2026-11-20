@@ -7,8 +7,7 @@
 # 環境変数:
 #   MOBSF_API_KEY  MobSF の REST API キー（必須）。Podman で起動するときに同じ値を -e MOBSF_API_KEY で渡す
 #   MOBSF_URL      MobSF の URL（既定 http://localhost:8000）
-#   MOBSF_WAIT_SEC MobSF が起動するまで待つ秒数（既定 900）。
-#                  MobSF は起動のたびに解析の道具（JADX）を GitHub から取ってくるので、回線しだいで数分かかる
+#   MOBSF_WAIT_SEC MobSF が起動するまで待つ秒数（既定 300）
 #
 # 出力:
 #   report.json     解析結果のすべて
@@ -23,7 +22,7 @@ apk="${1:?APK のパスを指定してください（例: app/build/outputs/apk/
 out="${2:-build/reports/mobsf}"
 url="${MOBSF_URL:-http://localhost:8000}"
 key="${MOBSF_API_KEY:?MOBSF_API_KEY を設定してください}"
-wait_sec="${MOBSF_WAIT_SEC:-900}"
+wait_sec="${MOBSF_WAIT_SEC:-300}"
 
 [[ -f "$apk" ]] || { echo "APK が見つかりません: $apk" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq が必要です" >&2; exit 1; }
