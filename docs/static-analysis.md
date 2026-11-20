@@ -2,7 +2,9 @@
 
 このリポジトリで使っている静的解析とカバレッジの道具、手元での実行方法、CI での動き、指摘が出たときの扱いをまとめる。
 
-| 道具 | 何を見るか | 手元で実行 | レポート | 指摘で CI を止めるか |
+静的解析は手元で実行する。CI（GitHub Actions）での自動実行は今は止めていて、手で動かしたときだけ動く（下の「CI（GitHub Actions）」）。
+
+| 道具 | 何を見るか | 手元で実行 | レポート | 指摘で止めるか |
 | --- | --- | --- | --- | --- |
 | JaCoCo | 単体テストがどの行・分岐を通ったか（カバレッジ） | `./gradlew jacocoMockDebugUnitTestReport` | `app/build/reports/jacoco/jacocoMockDebugUnitTestReport/html/index.html` | 止めない（テストの失敗では止まる） |
 | Android Lint | Android 固有の問題（API レベル、リソース、マニフェスト、アクセシビリティなど） | `./gradlew lintMockDebug` | `app/build/reports/lint-results-mockDebug.html` | 止める（ベースラインにない error） |
@@ -28,7 +30,7 @@ Gradle で動く 3 つをまとめて実行するなら次のとおり。
 | `config/detekt/baseline.xml` | detekt の既存の指摘 |
 | `app/lint-baseline.xml` | Lint の既存の指摘（初回に作る。下の「Android Lint」） |
 | `scripts/mobsf-scan.sh` | MobSF に APK を送ってレポートを保存するスクリプト |
-| `.github/workflows/static-analysis.yml` | 上の 4 つを CI で動かすワークフロー |
+| `.github/workflows/static-analysis.yml` | 上の 4 つを CI で動かすワークフロー（今は手で動かしたときだけ） |
 
 ## ベースラインの考え方
 
@@ -99,7 +101,7 @@ UI（Composable）は単体テストでほとんど通らないので、全体�
 | `baseline` | `app/lint-baseline.xml` | 既存の指摘を無視する |
 | `abortOnError` | `true` | ベースラインにない error でビルドを止める |
 | `warningsAsErrors` | `false` | warning では止めない（レポートには出る） |
-| `checkReleaseBuilds` | `false` | `assembleRelease` のたびに Lint を走らせない（CI の Lint ジョブで見る） |
+| `checkReleaseBuilds` | `false` | `assembleRelease` のたびに Lint を走らせない（`./gradlew lintMockDebug` で別に見る） |
 | `htmlReport` / `xmlReport` / `sarifReport` | `true` | 人が読む用と、ほかの道具に読ませる用 |
 
 ### 初回：ベースラインを作る（1 回だけ）
@@ -114,7 +116,7 @@ git commit -m "Android Lint のベースラインを作る"
 ```
 
 CI はベースラインが無いときだけ同じ指定で実行し、できた `app/lint-baseline.xml` を成果物（`lint-report`）に入れる。
-手元で作れないときは、CI の成果物からダウンロードしてコミットしてもよい。
+手元で作れないときは、Actions の画面から static-analysis を手で動かし、その成果物からダウンロードしてコミットしてもよい。
 
 ### 実行
 
@@ -309,8 +311,12 @@ MobSF の結果では CI を止めていない。配布前に `high` の指摘�
 
 ## CI（GitHub Actions）
 
-`.github/workflows/static-analysis.yml` が、Pull Request と `develop` / `main` への push で動く。
-Actions の画面から手で実行することもできる（`workflow_dispatch`）。
+`.github/workflows/static-analysis.yml` は、今は手で動かしたときだけ動く（`workflow_dispatch`）。
+静的解析は手元で実行する運用にしたので、Pull Request と `develop` / `main` への push での自動実行はコメントアウトしてある。
+
+- 手で動かす: Actions の画面で static-analysis を選び、Run workflow からブランチを選んで実行する。
+  コマンドなら `gh workflow run static-analysis.yml --ref <ブランチ>`。
+- 自動実行に戻す: ワークフローの `on:` にある `pull_request:` と `push:` の 3 行のコメントを外す。
 
 | ジョブ | 実行するもの | 成果物 |
 | --- | --- | --- |

@@ -1,10 +1,13 @@
 # 静的解析とカバレッジ。使い方と、結果の見方・ベースラインの更新は docs/static-analysis.md。
 name: static-analysis
 
+# 静的解析は手元で実行する運用にしたので、Pull Request と push での自動実行は止めている。
+# 戻すときは下の 3 行のコメントを外す。workflow_dispatch は、ファイルを正しい形のまま残すためと、
+# 必要なときに Actions の画面から手で動かせるように残している。
 on:
-  pull_request:
-  push:
-    branches: [develop, main]
+  # pull_request:
+  # push:
+  #   branches: [develop, main]
   workflow_dispatch:
 
 # 同じブランチで新しく push されたら、古い実行は止める。
