@@ -1,10 +1,13 @@
 # 静的解析とカバレッジ。使い方と、結果の見方・ベースラインの更新は docs/static-analysis.md。
 name: static-analysis
 
+# 静的解析は手元で実行する運用にしたので、Pull Request と push での自動実行は止めている。
+# 戻すときは下の 3 行のコメントを外す。workflow_dispatch は、ファイルを正しい形のまま残すためと、
+# 必要なときに Actions の画面から手で動かせるように残している。
 on:
-  pull_request:
-  push:
-    branches: [develop, main]
+  # pull_request:
+  # push:
+  #   branches: [develop, main]
   workflow_dispatch:
 
 # 同じブランチで新しく push されたら、古い実行は止める。
@@ -104,10 +107,13 @@ jobs:
 
       # ubuntu-latest のランナーには Podman が入っている。services: は Docker でしか動かないので、ここで起動する。
       # APK を作っている間に起動が進むよう、先に立ち上げておく。
+      # --network host にして、ランナーの localhost:8000 でそのまま受ける。
+      # Podman 5 は一般ユーザーで動かすときのポート転送（-p）が pasta に変わり、
+      # このランナーではホストから -p 8000:8000 の先に届かなかった（MobSF は起動しているのに接続できない）。
       - name: MobSF を起動（Podman）
         run: |
           podman --version
-          podman run --rm -d --name mobsf -p 8000:8000 -e MOBSF_API_KEY="$MOBSF_API_KEY" "$MOBSF_IMAGE"
+          podman run --rm -d --name mobsf --network host -e MOBSF_API_KEY="$MOBSF_API_KEY" "$MOBSF_IMAGE"
 
       - uses: actions/setup-java@v4
         with:
@@ -124,7 +130,12 @@ jobs:
 
       - name: MobSF のログ（失敗したとき）
         if: failure()
-        run: podman logs mobsf || true
+        # 時刻を付けて出す。MobSF の中で Web サーバが起動した時刻（Listening at）と、スクリプトが諦めた時刻を比べられるようにする。
+        # 起動しているのに届かないときのために、ランナーから接続した結果もそのまま出す。
+        run: |
+          podman logs --timestamps mobsf || true
+          podman ps -a --filter name=mobsf || true
+          curl -sv -o /dev/null "$MOBSF_URL/" || true
 
       - name: MobSF を止める
         if: always()

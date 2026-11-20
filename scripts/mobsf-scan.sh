@@ -29,13 +29,20 @@ command -v jq >/dev/null || { echo "jq が必要です" >&2; exit 1; }
 mkdir -p "$out"
 
 # 起動直後は応答しないので、トップページが返るまで待つ。
-echo "MobSF の起動を待っています: $url"
+# 1 分ごとに経過時間と応答を出す（000 はまだ接続できない状態）。止まったときに、どこまで進んでいたかを追えるようにする。
+echo "MobSF の起動を待っています: $url（最大 ${wait_sec} 秒）"
+code="000"
 for ((i = 0; i < wait_sec; i += 5)); do
   code="$(curl -s -o /dev/null -w '%{http_code}' "$url/" || true)"
   [[ "$code" == "200" || "$code" == "302" ]] && break
+  (( i > 0 && i % 60 == 0 )) && echo "  ${i} 秒経過（応答: ${code}）"
   sleep 5
 done
-[[ "$code" == "200" || "$code" == "302" ]] || { echo "MobSF が ${wait_sec} 秒以内に起動しませんでした" >&2; exit 1; }
+[[ "$code" == "200" || "$code" == "302" ]] || {
+  echo "MobSF が ${wait_sec} 秒以内に起動しませんでした（最後の応答: ${code}）" >&2
+  exit 1
+}
+echo "MobSF が起動しました（${i} 秒）"
 
 api() {
   # $1: API のパス、残り: curl に渡す引数
